@@ -1,0 +1,10 @@
+[url "ssh://git@github.com"]
+	insteadOf = https://github.com
+
+[user]
+	name = tattsum
+	email = kurohari35@gmail.com
+
+[core]
+	excludesfile = ~/.gitignore_global
+
