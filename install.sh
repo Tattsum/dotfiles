@@ -43,6 +43,12 @@ link_file "$DOTFILES_DIR/cursor/cursor.toml" "$HOME/.config/cursor/cursor.toml"
 
 # tmux / vim / Gemini / Codex などは、設定ファイルを追加したタイミングで
 # この下に同様の `link_file` 呼び出しを追記していく運用を想定しています。
+# 例）tmux:
+# echo ""
+# echo "------------------------------"
+# echo "🪟 tmux の設定をリンクします..."
+# echo "------------------------------"
+# link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
 
 echo ""
 echo "✅ セットアップ完了！"

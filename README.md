@@ -18,7 +18,7 @@ dotfiles 管理用リポジトリです。
 
 - 例：`zsh` の設定を管理したい場合
   - `zsh/.zshrc` をこのリポジトリに追加
-  - `install.sh` の「今後追加する場合はこの下に追記してください。」のコメントの下に以下のように追記：
+  - `install.sh` に以下のようなブロックを追記：
     - `echo ""`
     - `echo "------------------------------"`
     - `echo "🐚 zsh の設定をリンクします..." `
@@ -26,3 +26,13 @@ dotfiles 管理用リポジトリです。
     - `link_file "$DOTFILES_DIR/zsh/.zshrc" "$HOME/.zshrc"`
 
 この README と `install.sh` をベースに、必要な設定を少しずつ追加していく想定です。
+
+## Cursor / Skills（汎用テンプレ）
+
+- **汎用 `.cursorrules`**
+  - `cursor/.cursorrules` を用意しています。
+  - 各リポジトリに入れたい場合は、そのリポジトリ直下へコピーして使ってください。
+- **汎用 Skills**
+  - `skills/` 配下に Cursor Agent Skill の雛形を置いています。
+  - 任意のリポジトリへ展開する例:
+    - `make -C skills install TARGET=/path/to/repo`
