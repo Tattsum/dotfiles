@@ -143,6 +143,217 @@
   - [ ] フォーム入力値のバリデーション（クライアントサイド + サーバサイド）が実装されているか
   - [ ] 不要な再レンダリングや重い計算をメインスレッドで行っていないか（メモ化 / 分割 / 遅延読み込み等）
 
+### PHP / Laravel（言語仕様 / Laravel 流儀 準拠チェック）
+
+- **前提**
+  - [ ] PHP の言語仕様・標準ライブラリに沿って実装されているか（[PHP Manual](https://www.php.net/manual/)）
+  - [ ] Laravel の公式ドキュメントに沿って実装されているか（[Laravel Docs](https://laravel.com/docs)）
+  - [ ] コーディングスタイルは PSR-12 を前提に一貫しているか（[PSR-12](https://www.php-fig.org/psr/psr-12/)）
+- **型 / 例外 / エラー設計**
+  - [ ] `declare(strict_types=1);` の方針がプロジェクトとして統一されているか（有無・適用範囲）
+  - [ ] 引数・戻り値の型宣言が適切か（PHPDoc 依存になりすぎていないか）
+  - [ ] 例外に機密情報を含めていないか（SQL、トークン、個人情報など）
+  - [ ] 例外の粒度が適切か（握りつぶし・過剰な catch-all をしていないか）
+- **Laravel の責務分離**
+  - [ ] Controller が肥大化していないか（UseCase/Service への切り出しが必要か）
+  - [ ] Eloquent Model にビジネスロジックを詰め込みすぎていないか
+  - [ ] FormRequest を使うべき入力検証が controller 内に散らばっていないか
+  - [ ] トランザクション境界が適切か（`DB::transaction()` の使い方）
+- **セキュリティ**
+  - [ ] Mass assignment のガード（`$fillable` / `$guarded`）が適切か
+  - [ ] 認証・認可（Policies / Gates / Middleware）の漏れがないか
+  - [ ] Blade / フロントへの出力でエスケープが保証されているか
+  - [ ] ログに機密情報を出していないか
+- **パフォーマンス**
+  - [ ] N+1 がないか（`with()` / `load()` 等で解消されているか）
+  - [ ] 重い処理を同期リクエストに押し込んでいないか（Queue/Job 化の検討）
+  - [ ] コレクション操作でメモリを食い潰していないか（`chunk()` / `cursor()` / pagination）
+
+### データベース設計ルール（レビューガイド）
+
+このドキュメントは、データベース設計に関するコードレビューのガイドラインです。
+
+- **テーブル構成の確認（task コマンド）**
+  - **全テーブル一覧の表示**
+    - `task db:list-tables`
+    - crm データベース内の全テーブル一覧を表示
+    - テーブル名を確認してから `db:show-table` を使用する際に便利
+  - **特定テーブルの定義表示**
+    - `task db:show-table -- <テーブル名>`
+    - 指定したテーブルの CREATE TABLE 文を表示
+    - 使用例:
+
+```bash
+task db:show-table -- members
+task db:show-table -- clients
+```
+
+- **外部キー制約**
+  - [ ] ❌ 原則設定しない
+  - **理由**: 外部キー制約は暗黙的な共有ロックを取り、deadlock の要因になる
+- **インデックス / 制約の命名**
+  - [ ] ✅ 推奨: インデックス名や制約名は明示的に指定せず、Laravel の自動命名に任せる
+  - [ ] ⚠️ 例外: MySQL の制約（64 文字制限）に引っかかる場合のみ、手動で短縮した名前を指定する
+- **主キー**
+  - [ ] ✅ 必須: テーブルの主キーは常に整数型（BIGINT or INT）の `id` とする
+  - [ ] ⚠️ 例外: パーティションテーブルでは、`char(36)`（例：`client_id`）や `datetime` 型を複合主キーに含めることを許容する
+  - **理由**: MySQL の技術的制約として、パーティションキーは PRIMARY KEY または UNIQUE KEY に含まれている必要がある
+
+例:
+
+```php
+// ✅ 推奨: 主キーはBIGINT型のid
+Schema::create('member_rank_lower_limits', function (Blueprint $table) {
+    $table->id();  // BIGINT型の主キー
+    $table->string('client_id');
+    $table->integer('rank_id');
+    $table->timestamps();
+});
+```
+
+```php
+// ❌ 避ける: 複合主キー
+Schema::create('member_rank_lower_limits', function (Blueprint $table) {
+    $table->string('client_id');
+    $table->integer('rank_id');
+    $table->primary(['client_id', 'rank_id']);  // 避ける
+    $table->timestamps();
+});
+```
+
+```sql
+-- ✅ 許容: パーティションテーブルの複合主キー（パーティションキーを含める）
+CREATE TABLE `member_coupon2_usage_histories` (
+    `id` bigint unsigned AUTO_INCREMENT,
+    `client_id` char(36) NOT NULL,
+    `used_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `client_id`, `used_at`),
+    ...
+)
+PARTITION BY RANGE (YEAR(used_at))
+SUBPARTITION BY KEY (client_id)
+SUBPARTITIONS 16;
+```
+
+### テストコードのレビュールール（PHPUnit / Laravel）
+
+このドキュメントは、テストコードに関するコードレビューのガイドラインです。
+
+- **テスト関数命名規約**
+  - [ ] ✅ 必須: `test_{対象関数の名前}_{説明}` の形式
+  - [ ] ✅ 必須: 全体はスネークケース
+  - [ ] ✅ 必須: `{対象関数の名前}` と `{説明}` の部分は英語のキャメルケース
+  - [ ] ❌ 禁止: 日本語の使用
+  - [ ] ✅ 必須: `@testdox` アノテーションで日本語説明を書く
+
+例:
+
+```php
+/**
+ * @testdox 有効なSKUでクライアント解析が正常に動作する
+ */
+public function test_parseClients_withValidSku(): void
+{
+    // テスト実装
+}
+```
+
+- **テスト構造**
+  - [ ] Act & Assert を分離して読みやすくする
+
+```php
+// Act
+$actual = SomeService::getData($client);
+
+// Assert
+$expected = [
+    'client_id' => $client->id,
+    'trigger_id' => $trigger->id,
+    'title' => 'test',
+];
+$this->assertEquals($expected, $actual);
+```
+
+- **アサーションの使い分け**
+  - [ ] 厳密な型チェックが可能な場合は、`assertEquals()` ではなく `assertSame()` を使う
+  - **指針**
+    - `assertSame()`: プリミティブ（int/string/bool/null）や同一インスタンス比較
+    - `assertEquals()`: 配列・オブジェクトの構造的等価性（再帰比較）
+
+```php
+$this->assertSame(123, $actual);
+$this->assertSame('test', $actual);
+$this->assertSame(true, $actual);
+```
+
+```php
+$expected_array = ['a' => 1, 'b' => 2];
+$this->assertEquals($expected_array, $actual_array);
+```
+
+- **TestHelper の活用**
+  - [ ] `$client`, `$staff`, `$member` を arrange で作る場合は TestHelper を検討する（型が付き linter/補完が向上）
+  - 利用可能なメソッド例:
+    - `TestHelper::createClient(array $args = []): Client`
+    - `TestHelper::createMember(array $params): Member`
+    - `TestHelper::createClientStaff(array $args = []): array`（`[Client, Staff]`）
+
+```php
+// Arrange
+$client = TestHelper::createClient(['name' => 'Test Client']);
+$member = TestHelper::createMember(['client_id' => $client->id]);
+```
+
+- **DatabaseTransactions**
+  - [ ] ✅ 優先: `use DatabaseTransactions;`
+  - [ ] ❌ 制限: `RefreshDatabase` はできるだけ避ける
+
+```php
+use Illuminate\Foundation\Testing\DatabaseTransactions;
+
+class SomeServiceTest extends TestCase
+{
+    use DatabaseTransactions;
+}
+```
+
+- **時刻のモック**
+  - [ ] ✅ 必須: `Carbon::setTestNow(...)` または `CarbonImmutable::setTestNow(...)`
+  - [ ] ❌ 禁止: 現在時刻の直接使用（`now()` など）
+
+```php
+Carbon::setTestNow('2006-01-02 15:04:05');
+```
+
+- **モック使用の制限**
+  - [ ] ✅ 許可: 外部 API / ファイルシステム / メール送信 / 決済 API
+  - [ ] ❌ 避ける: 同一アプリケーション内のサービスクラス / Eloquent / 内部ビジネスロジック
+
+```php
+// ✅ 推奨: 外部APIのモック
+$mock = $this->mock(StripeApiClient::class);
+$mock->shouldReceive('charge')->andReturn(['status' => 'success']);
+```
+
+- **assertDatabaseHas**
+  - [ ] DB 書き込みをテストする場合は積極的に使用する
+
+```php
+$this->assertDatabaseHas('point_events', [
+    'client_id' => $client->id,
+    'member_id' => 'test-member-1',
+    'event_type' => 'earned',
+]);
+```
+
+- **PHPDoc 型注釈**
+  - [ ] Factory 等で推論が弱い場合は `@var` を補う
+
+```php
+/** @var Trigger $trigger */
+$trigger = Trigger::factory()->create(['client_id' => $client->id]);
+```
+
 ---
 
 ## レビュー時の出力フォーマット
