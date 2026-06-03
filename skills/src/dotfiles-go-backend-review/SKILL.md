@@ -1,3 +1,8 @@
+---
+name: dotfiles-go-backend-review
+description: Go バックエンド（handler / usecase / entity・domain / infrastructure のレイヤー構成）の差分をレビューするとき。Clean Architecture・gRPC の複数観点で漏れなく確認し、コードは修正せず重要度別の指摘リストを報告する。
+---
+
 ## 目的
 
 Go バックエンド（handler / usecase / entity・domain / infrastructure のレイヤー構成）の差分を、**複数観点で漏れなくレビュー**する。コードの修正は行わず、指摘リストの報告に徹する。

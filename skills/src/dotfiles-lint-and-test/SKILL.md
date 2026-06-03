@@ -1,3 +1,8 @@
+---
+name: dotfiles-lint-and-test
+description: コード変更後に lint / format / test を回して品質を担保するとき。README / Makefile / package.json / go.mod / CI 設定からリポジトリ標準コマンドを特定し、最短手順で実行する。
+---
+
 ## 目的
 
 変更後に **lint / format / test** を確実に回して品質を担保する。

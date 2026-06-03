@@ -1,3 +1,8 @@
+---
+name: dotfiles-commit-push
+description: git のコミット・push を行うとき。秘密情報（鍵・トークン・認証情報・個人情報）の混入チェックと、Emoji + Title + Reason + Specification のコミットメッセージ規約を強制する。
+---
+
 ## 目的
 
 コミット・push を安全に行う（秘密情報を混入させない）。

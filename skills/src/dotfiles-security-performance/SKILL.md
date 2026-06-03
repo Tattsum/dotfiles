@@ -1,3 +1,8 @@
+---
+name: dotfiles-security-performance
+description: 設計・実装・レビューでセキュリティとパフォーマンスを重点的にチェックするとき。入力検証・認証認可・秘密情報の漏洩・N+1・メモリ/IO 効率を Must / Should / Nice to have で指摘する。
+---
+
 ## 目的
 
 設計・実装・レビューで **セキュリティとパフォーマンスを最優先**に判断する。

@@ -25,6 +25,19 @@ link_file "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 
 echo ""
 echo "------------------------------"
+echo "🧩 Claude Code のグローバル skill をリンクします..."
+echo "------------------------------"
+mkdir -p "$HOME/.claude/skills"
+for skill_dir in "$DOTFILES_DIR"/skills/src/*/; do
+  [ -d "$skill_dir" ] || continue
+  skill_name="$(basename "$skill_dir")"
+  # ディレクトリリンクは -n を付けて既存リンク先への潜り込みを防ぐ
+  ln -sfn "$skill_dir" "$HOME/.claude/skills/$skill_name"
+  echo "  ✅ $HOME/.claude/skills/$skill_name -> $skill_dir"
+done
+
+echo ""
+echo "------------------------------"
 echo "🐚 zsh の設定をリンクします..."
 echo "------------------------------"
 link_file "$DOTFILES_DIR/zsh/.zshrc" "$HOME/.zshrc"
