@@ -138,6 +138,86 @@ Specification:
   - [ ] 標準ライブラリで足りるところはまず標準を使っているか
   - [ ] 「シンプルさ」と「読みやすさ」を優先した実装になっているか
 
+### バックエンド（Go + Clean Architecture + gRPC）追加レビュー観点
+
+handler / usecase / entity（domain）/ infrastructure のレイヤー構成を持つ Go バックエンドを対象とした実務的なレビュー観点。
+
+- **レイヤー境界・責務（Clean Architecture）**
+  - [ ] handler 層にビジネスロジック（条件分岐・フィルタリング・計算）が混在していないか。handler は転送形式↔ドメインのマッピング、usecase はビジネスロジック組み立て、entity はドメインの振る舞いに徹しているか
+  - [ ] usecase / entity 層が転送層の型（protobuf 等）を直接参照していないか
+  - [ ] ドメイン知識が本来所属する package に書かれているか（例: あるユーザーの未公開記事一覧の取得ロジックは user 側ではなく記事ドメイン側に置く）
+  - [ ] 腐敗防止層: 外部 API（決済・外部サービス等）の型・概念を usecase / entity に持ち込まず、infrastructure 層でドメイン型へマッピングしているか
+  - [ ] エラーの gRPC ステータスコードへの変換は handler 層で行っているか（`status.Error(codes.XXX, ...)` を usecase / repository で返すと、CLI・バッチ等から再利用できなくなる）
+  - [ ] 意味的に正しいサービスメソッドを呼んでいるか（存在確認に一覧取得の件数を見るのではなく、単体取得の NotFound を使う等）
+
+- **コード設計・YAGNI（レイヤーで適用度を変える）**
+  - [ ] application 層（handler / usecase）は変更コストが低いので「今必要なコードのみ」。一方 gRPC 定義・DB スキーマは変更コストが高い（クライアント影響・マイグレーション）ため将来の拡張を見越した設計を許容する
+  - [ ] ユースケース上通り得ない条件のチェック・防御的コードを書いていないか（上流で保証済みの条件を再チェックしていないか）
+  - [ ] 既存の処理・ユーティリティで代替できる新規実装になっていないか
+  - [ ] 単一責任（SRP）で関数が分離されているか。複雑なフィルタリング等は共通関数に切り出し、複数箇所での不整合を防いでいるか
+
+- **不要コード検出**
+  - [ ] 今回の変更で不要になった関数・const・引数が残っていないか
+  - [ ] `return err` している箇所で `log.Errorf` を重複して呼んでいないか（エラーを共通のミドルウェア層で出力する設計なら個別ログはノイズになる）
+  - [ ] 常に取得する必要がないデータは、フラグ・条件を先に確認してから取得しているか（全件取得後フィルタで不要な DB / API アクセスを発生させていないか）
+
+- **Go イディオム・型安全性**
+  - [ ] struct は原則 pointer で受け渡し（戻り値・レシーバとも）。ただし value object（immutable）は値型で定義しているか
+  - [ ] optional 表現: primitive 型は `*string` / `*int32` のようにポインタで nil を表現しているか（値型の optional ラッパーは過剰になりやすい）
+  - [ ] nil と 0（ゼロ値）を区別しないフィールドに pointer / optional を使っていないか（例: offset）
+  - [ ] nil になり得ないフィールドに nil チェックを書いていないか。逆に nil になり得るなら optional で定義しているか
+  - [ ] 早期 return している if の後に `else` を続けていないか
+  - [ ] 外部入力の文字列→整数変換で `strconv.Atoi`（32bit オーバーフロー懸念）を避け、`strconv.ParseInt` で bit 数を明示しているか
+  - [ ] package スコープの型・変数名が広すぎないか（`Option`→`OrderOption` のように `package名.型名` で読んで意味が通るか）
+  - [ ] エラー判定に `err.Error()` の文字列比較や `strings.Contains` を使わず、sentinel error / カスタムエラー型 + `errors.Is` / `errors.As` で判定しているか
+  - [ ] slice 初期化で cap が事前に分かるなら `make([]T, 0, len(items))` で指定しているか（根拠のない倍数 `len(x)*2` 等は使わない）
+
+- **命名・関数設計**
+  - [ ] 関数名と実処理に乖離がないか（取得+加工は `fetch`/`get` でなく `resolve`/`load`。フィルタを含む `ListXxx` は `xxx.FilterActive()` 併用か `ListActiveXxx` を用意）
+  - [ ] `buildXXX` がデータ取得まで行っていないか（取得は呼び出し元で行い build に渡す）
+  - [ ] 特定ファイルでしか使わないヘルパーは package 関数でなくレシーバメソッドにしているか（複数ファイル共用なら package 関数のまま）
+  - [ ] 命名規約: 見つからなければ error なら `Get`、error を返さず optional/nil/zero を返すなら `Find`。`FindFirstByXXX` のような冗長命名を避けているか
+  - [ ] 複数箇所で参照する文字列を const 化しているか（1 箇所のみなら直書きの方が可読）
+  - [ ] 変数を使用ブロック内で定義しスコープを最小化しているか
+  - [ ] ファイル名とその中のメイン型名を一致させているか
+  - [ ] repository の関数名はシンプルに保っているか（`Exists` を足さず `Find`/`Get` で代用、更新系は `Create`/`Update` 程度に留める）
+  - [ ] 複数アイテムを返す関数に `List` プレフィックスを使っているか（`GetXxxs` でなく `ListXxx`、`FetchAll`/`FindMany` を避ける）
+
+- **DB 設計（マイグレーション）**
+  - [ ] 固定長でない文字列カラムは `VARCHAR(255)`（外部生成の ID 等）。固定長不変値（UUID 等）のみ `CHAR(36)` か
+  - [ ] 新テーブル名が既存同種テーブルの命名パターンに揃っているか
+  - [ ] ライフサイクルの status カラムは ENUM / CHECK 制約を検討しているか（説明的・カジュアル変更される値は VARCHAR が適切）
+  - [ ] 種別が異なるもの（例: コンテンツへの通報とユーザーへの通報）を 1 テーブルで管理し、type により他カラムの意味が変わる設計になっていないか
+  - [ ] `ON DELETE CASCADE` を使わず application 側で明示削除しているか（削除タイミングをコードから追跡できるように）
+  - [ ] application から明示的に入れる値に不要な DEFAULT を設定していないか。NULL が入り得ないなら NOT NULL、JSON 配列の DEFAULT は `[]` か
+  - [ ] CHARSET は `utf8mb4`（`utf8` / `utf8mb3` は不可）。COLLATE は判定フロー（濁点区別不要→`utf8mb4_0900_ai_ci` / 多言語重要→`utf8mb4_unicode_ci` / それ以外→`utf8mb4_general_ci`）で選択。大小区別不要なカラムに `utf8mb4_bin` を使っていないか
+  - [ ] slice を IN 句に渡す関数で `len == 0` のガードがあるか（空 slice は SQL エラー）
+  - [ ] 時間系カラムは `DATETIME`（`TIMESTAMP` は 2038 年問題で不可）。`created_at` / `updated_at` は `DEFAULT CURRENT_TIMESTAMP` / `ON UPDATE CURRENT_TIMESTAMP` の定型で定義しているか
+
+- **パフォーマンス・堅牢性**
+  - [ ] 外部 API / DB の retry は固定間隔でなく exponential backoff か
+  - [ ] キャッシュ TTL が必要以上に長くないか（古いデータが返り続ける副作用を避け、効果が得られる最低限に）
+  - [ ] URL の処理に `strings.Cut`/`Split` でなく `url.Parse` / `url.URL` を使っているか
+  - [ ] 外部値を URL パラメータに埋め込む際 `url.QueryEscape` でエスケープしているか
+  - [ ] WHERE / JOIN のカラムにインデックスがあるか。複合インデックスはカーディナリティの高いカラムを先頭にしているか
+  - [ ] for ループ内で DB クエリ / 外部 API を呼ぶ N+1 になっていないか（`ListByIDs` 等の一括取得で代替）。protobuf の repeated 生成等でも N+1 が起きていないか
+  - [ ] 複数データソースを組み合わせる処理で取得タイミングのズレによる不整合を防御しているか（トランザクション / 取得後の存在確認）
+
+- **テスト戦略**
+  - [ ] integration test は setup が重いので、ケースが複数でも setup を 1 回にまとめ、assert を `t.Run` で分けているか。state 依存テストに `t.Parallel()` を使っていないか（flaky の原因）
+  - [ ] repository 実装（Get/Create 等）に実 DB アクセスを含むテストがあるか（mock のみで済ませていないか）。テストファイルは実装と同じディレクトリに置いているか
+  - [ ] 新規 API エンドポイント（handler）に integration test があるか（handler→usecase→repository の一連を担保）
+  - [ ] ロジック（条件分岐・計算・変換）を持つ関数、entity / value object のメソッドにテストがあるか（単純な getter/mapping は不要）
+
+- **テスト品質（偽陰性・偽陽性の排除）**
+  - [ ] integration test のテストデータにプロダクションコードの定数を使わず文字列リテラル直書きにしているか（定数値の誤変更を検知するため）
+  - [ ] テストデータ・期待値にゼロ値（`0`/`""`/`false`/`nil`）を使っていないか（初期化漏れと区別がつかず偽陰性になる。`42`/`"test_value"` 等を使う）
+  - [ ] 各テストがそのレイヤーの責務に絞った検証になっているか（integration は入出力の振る舞い、内部ロジックは unit test）
+  - [ ] `assert.NotNil` / `NotEmpty` / `Len` だけで済ませず具体値で assert しているか
+  - [ ] integration test の assert 粒度が、テスト対象に関係するフィールドに絞られているか（全フィールド厳密 assert は偽陽性、粗すぎは見逃し）
+  - [ ] API レスポンス仕様（フィールド有無・ソート順・ページネーション）がテストに表現され、テストがドキュメントとして機能しているか
+  - [ ] 境界値（ページ境界・日時範囲・空リスト・上限値）を意識したテストデータがあるか
+
 ### gRPC / Protobuf
 
 - **スキーマ設計**
