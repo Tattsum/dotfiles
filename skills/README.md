@@ -18,6 +18,8 @@ skills/
     ├── dotfiles-commit-push/SKILL.md
     ├── dotfiles-go-backend-review/SKILL.md
     ├── dotfiles-lint-and-test/SKILL.md
+    ├── dotfiles-php-laravel-lint-test/SKILL.md
+    ├── dotfiles-php-laravel-review/SKILL.md
     └── dotfiles-security-performance/SKILL.md
 ```
 

@@ -273,6 +273,7 @@ handler / usecase / entity（domain）/ infrastructure のレイヤー構成を�
   - [ ] 引数・戻り値の型宣言が適切か（PHPDoc 依存になりすぎていないか）
   - [ ] 例外に機密情報を含めていないか（SQL、トークン、個人情報など）
   - [ ] 例外の粒度が適切か（握りつぶし・過剰な catch-all をしていないか）
+  - [ ] `empty()` で必須値の有無を判定していないか（`'0'` / `0` / `false` を「空」と誤判定する落とし穴。null 判定は `is_null()` / `?? ` を使う）
 - **Laravel の責務分離**
   - [ ] Controller が肥大化していないか（UseCase/Service への切り出しが必要か）
   - [ ] Eloquent Model にビジネスロジックを詰め込みすぎていないか
@@ -297,23 +298,10 @@ handler / usecase / entity（domain）/ infrastructure のレイヤー構成を�
 
 ### データベース設計ルール（レビューガイド）
 
-このドキュメントは、データベース設計に関するコードレビューのガイドラインです。
+リレーショナル DB（MySQL 想定）のスキーマ設計に関するレビュー観点。
 
-- **テーブル構成の確認（task コマンド）**
-  - **全テーブル一覧の表示**
-    - `task db:list-tables`
-    - crm データベース内の全テーブル一覧を表示
-    - テーブル名を確認してから `db:show-table` を使用する際に便利
-  - **特定テーブルの定義表示**
-    - `task db:show-table -- <テーブル名>`
-    - 指定したテーブルの CREATE TABLE 文を表示
-    - 使用例:
-
-```bash
-task db:show-table -- members
-task db:show-table -- clients
-```
-
+- **既存スキーマの確認**
+  - テーブル定義を確認する際は `cat` で雑にファイルを読むのではなく、リポジトリ標準のスキーマ確認手段（マイグレーションファイル / スキーマダンプ / DB クライアントの `SHOW CREATE TABLE` 等）で正確な定義を参照する
 - **外部キー制約**
   - [ ] ❌ 原則設定しない
   - **理由**: 外部キー制約は暗黙的な共有ロックを取り、deadlock の要因になる
@@ -321,43 +309,43 @@ task db:show-table -- clients
   - [ ] ✅ 推奨: インデックス名や制約名は明示的に指定せず、Laravel の自動命名に任せる
   - [ ] ⚠️ 例外: MySQL の制約（64 文字制限）に引っかかる場合のみ、手動で短縮した名前を指定する
 - **主キー**
-  - [ ] ✅ 必須: テーブルの主キーは常に整数型（BIGINT or INT）の `id` とする
-  - [ ] ⚠️ 例外: パーティションテーブルでは、`char(36)`（例：`client_id`）や `datetime` 型を複合主キーに含めることを許容する
+  - [ ] ✅ 必須: テーブルの主キーは常に整数型（BIGINT or INT）の Auto Increment な `id` とする（UUID を id に使うのはアンチパターン）
+  - [ ] ⚠️ 例外: パーティションテーブルでは、`char(36)`（例：`tenant_id`）や `datetime` 型を複合主キーに含めることを許容する
   - **理由**: MySQL の技術的制約として、パーティションキーは PRIMARY KEY または UNIQUE KEY に含まれている必要がある
 
-例:
+例（スキーマビルダは一例。フレームワーク非依存の原則として読む）:
 
 ```php
 // ✅ 推奨: 主キーはBIGINT型のid
-Schema::create('member_rank_lower_limits', function (Blueprint $table) {
+Schema::create('user_settings', function (Blueprint $table) {
     $table->id();  // BIGINT型の主キー
-    $table->string('client_id');
-    $table->integer('rank_id');
+    $table->string('tenant_id');
+    $table->integer('category_id');
     $table->timestamps();
 });
 ```
 
 ```php
 // ❌ 避ける: 複合主キー
-Schema::create('member_rank_lower_limits', function (Blueprint $table) {
-    $table->string('client_id');
-    $table->integer('rank_id');
-    $table->primary(['client_id', 'rank_id']);  // 避ける
+Schema::create('user_settings', function (Blueprint $table) {
+    $table->string('tenant_id');
+    $table->integer('category_id');
+    $table->primary(['tenant_id', 'category_id']);  // 避ける
     $table->timestamps();
 });
 ```
 
 ```sql
 -- ✅ 許容: パーティションテーブルの複合主キー（パーティションキーを含める）
-CREATE TABLE `member_coupon2_usage_histories` (
+CREATE TABLE `event_logs` (
     `id` bigint unsigned AUTO_INCREMENT,
-    `client_id` char(36) NOT NULL,
-    `used_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (`id`, `client_id`, `used_at`),
+    `tenant_id` char(36) NOT NULL,
+    `occurred_at` datetime NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (`id`, `tenant_id`, `occurred_at`),
     ...
 )
-PARTITION BY RANGE (YEAR(used_at))
-SUBPARTITION BY KEY (client_id)
+PARTITION BY RANGE (YEAR(occurred_at))
+SUBPARTITION BY KEY (tenant_id)
 SUBPARTITIONS 16;
 ```
 
@@ -376,9 +364,9 @@ SUBPARTITIONS 16;
 
 ```php
 /**
- * @testdox 有効なSKUでクライアント解析が正常に動作する
+ * @testdox 有効な入力で価格パースが正常に動作する
  */
-public function test_parseClients_withValidSku(): void
+public function test_parsePrice_withValidInput(): void
 {
     // テスト実装
 }
@@ -389,12 +377,12 @@ public function test_parseClients_withValidSku(): void
 
 ```php
 // Act
-$actual = SomeService::getData($client);
+$actual = OrderSummary::build($order);
 
 // Assert
 $expected = [
-    'client_id' => $client->id,
-    'trigger_id' => $trigger->id,
+    'order_id' => $order->id,
+    'user_id' => $user->id,
     'title' => 'test',
 ];
 $this->assertEquals($expected, $actual);
@@ -417,17 +405,14 @@ $expected_array = ['a' => 1, 'b' => 2];
 $this->assertEquals($expected_array, $actual_array);
 ```
 
-- **TestHelper の活用**
-  - [ ] `$client`, `$staff`, `$member` を arrange で作る場合は TestHelper を検討する（型が付き linter/補完が向上）
-  - 利用可能なメソッド例:
-    - `TestHelper::createClient(array $args = []): Client`
-    - `TestHelper::createMember(array $params): Member`
-    - `TestHelper::createClientStaff(array $args = []): array`（`[Client, Staff]`）
+- **テスト用 Factory / Helper の活用**
+  - [ ] arrange でドメインオブジェクトを作る場合は、型が付くプロジェクト共通の Factory / Helper を活用する（戻り値に型が付き linter/補完が向上する）
+  - 型が推論されない生成（`factory()->create()` 等）には `@var` で型を補う
 
 ```php
-// Arrange
-$client = TestHelper::createClient(['name' => 'Test Client']);
-$member = TestHelper::createMember(['client_id' => $client->id]);
+// Arrange（型付きヘルパーの例）
+$user = TestFactory::createUser(['name' => 'Test User']);
+$order = TestFactory::createOrder(['user_id' => $user->id]);
 ```
 
 - **DatabaseTransactions**
@@ -465,10 +450,10 @@ $mock->shouldReceive('charge')->andReturn(['status' => 'success']);
   - [ ] DB 書き込みをテストする場合は積極的に使用する
 
 ```php
-$this->assertDatabaseHas('point_events', [
-    'client_id' => $client->id,
-    'member_id' => 'test-member-1',
-    'event_type' => 'earned',
+$this->assertDatabaseHas('order_events', [
+    'tenant_id' => $tenant->id,
+    'user_id' => 'test-user-1',
+    'event_type' => 'created',
 ]);
 ```
 
@@ -476,8 +461,8 @@ $this->assertDatabaseHas('point_events', [
   - [ ] Factory 等で推論が弱い場合は `@var` を補う
 
 ```php
-/** @var Trigger $trigger */
-$trigger = Trigger::factory()->create(['client_id' => $client->id]);
+/** @var Order $order */
+$order = Order::factory()->create(['user_id' => $user->id]);
 ```
 
 - **ユニットテストとインテグレーションテストの分離**
