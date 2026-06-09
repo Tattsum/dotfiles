@@ -21,10 +21,18 @@ skills/
     ├── dotfiles-php-laravel-lint-test/SKILL.md
     ├── dotfiles-php-laravel-review/SKILL.md
     ├── dotfiles-security-performance/SKILL.md
-    ├── review-go-architecture/SKILL.md
-    ├── review-go-idioms/SKILL.md
-    ├── review-go-storage/SKILL.md
-    ├── review-go-test/SKILL.md
+    ├── review-go-architecture/
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
+    ├── review-go-idioms/
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
+    ├── review-go-storage/
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
+    ├── review-go-test/
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
     └── devin-task-triage/SKILL.md
 ```
 
@@ -32,4 +40,5 @@ skills/
 
 - `make -C skills list`
 - `make -C skills install TARGET=<path-to-repo-root>`
+- `make -C skills install-global` — `~/.claude/skills/` に全スキルをコピー（Claude Code グローバル利用）
 

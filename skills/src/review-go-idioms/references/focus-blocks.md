@@ -7,7 +7,7 @@ Use one block per subagent. Keep each subagent constrained to its assigned block
 Review pointer/value usage, optional/nil representation, and errors.
 
 - Use pointers for mutable structs and constructor returns unless the type is an immutable value object.
-- Primitive optional values may use pointers such as `*string`; optional structs should use `yoptional`.
+- Primitive optional values may use pointers such as `*string`; optional structs should use the project-specific optional wrapper type.
 - Do not model nil separately when zero value and nil have the same business meaning.
 - If a value cannot be nil, avoid nil checks that imply it can be. If it can be nil, make that explicit in the type.
 - Do not branch on error strings. Use sentinel errors or custom error types with `errors.Is` / `errors.As`.
