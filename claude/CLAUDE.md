@@ -163,7 +163,7 @@ handler / usecase / entity（domain）/ infrastructure のレイヤー構成を�
 
 - **Go イディオム・型安全性**
   - [ ] struct は原則 pointer で受け渡し（戻り値・レシーバとも）。ただし value object（immutable）は値型で定義しているか
-  - [ ] optional 表現: primitive 型は `*string` / `*int32` のようにポインタで nil を表現しているか（値型の optional ラッパーは過剰になりやすい）
+  - [ ] optional 表現: primitive 型は `*string` / `*int32` のようにポインタで nil を表現しているか。optional な struct 型は `yoptional` を使っているか（値型の optional ラッパーは過剰になりやすい）
   - [ ] nil と 0（ゼロ値）を区別しないフィールドに pointer / optional を使っていないか（例: offset）
   - [ ] nil になり得ないフィールドに nil チェックを書いていないか。逆に nil になり得るなら optional で定義しているか
   - [ ] 早期 return している if の後に `else` を続けていないか

@@ -20,7 +20,11 @@ skills/
     ├── dotfiles-lint-and-test/SKILL.md
     ├── dotfiles-php-laravel-lint-test/SKILL.md
     ├── dotfiles-php-laravel-review/SKILL.md
-    └── dotfiles-security-performance/SKILL.md
+    ├── dotfiles-security-performance/SKILL.md
+    ├── review-go-architecture/SKILL.md
+    ├── review-go-idioms/SKILL.md
+    ├── review-go-storage/SKILL.md
+    └── review-go-test/SKILL.md
 ```
 
 ## コマンド
