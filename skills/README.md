@@ -24,7 +24,8 @@ skills/
     ├── review-go-architecture/SKILL.md
     ├── review-go-idioms/SKILL.md
     ├── review-go-storage/SKILL.md
-    └── review-go-test/SKILL.md
+    ├── review-go-test/SKILL.md
+    └── devin-task-triage/SKILL.md
 ```
 
 ## コマンド
