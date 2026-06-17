@@ -15,7 +15,7 @@ install:
 		if [ -d "$$d" ]; then \
 			name="$$(basename "$$d")"; \
 			mkdir -p "$(TARGET)/.cursor/skills/$$name"; \
-			cp -f "$$d/SKILL.md" "$(TARGET)/.cursor/skills/$$name/SKILL.md"; \
+			cp -rf "$$d/." "$(TARGET)/.cursor/skills/$$name/"; \
 			echo "installed: $$name"; \
 		fi; \
 	done

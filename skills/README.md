@@ -19,7 +19,7 @@ skills/
     ├── dotfiles-go-backend-review/SKILL.md
     ├── dotfiles-lint-and-test/SKILL.md
     ├── dotfiles-php-laravel-lint-test/SKILL.md
-    ├── dotfiles-php-laravel-review/SKILL.md
+    ├── dotfiles-php-laravel-review/SKILL.md   # PHP/Laravel レビューのオーケストレーター（5観点を並列起動）
     ├── dotfiles-security-performance/SKILL.md
     ├── review-go-architecture/
     │   ├── SKILL.md
@@ -31,6 +31,21 @@ skills/
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
     ├── review-go-test/
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
+    ├── review-php-architecture/
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
+    ├── review-php-idioms/
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
+    ├── review-php-storage/
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
+    ├── review-php-test/
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
+    ├── review-php-security/
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
     └── devin-task-triage/SKILL.md
