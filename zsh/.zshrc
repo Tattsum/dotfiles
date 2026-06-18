@@ -3,7 +3,7 @@
 # Kiro CLI pre block. Keep at the top of this file.
 [[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.pre.zsh"
 
-autoload -Uz compinit colors vcs_info add-zsh-hook
+autoload -Uz compinit colors
 compinit
 colors
 
@@ -28,14 +28,8 @@ zstyle ':completion:*' matcher-list 'm:{a-z}={A-Z}'
 zstyle ':completion:*' ignore-parents parent pwd ..
 zstyle ':completion:*:sudo:*' command-path /usr/local/sbin /usr/local/bin /usr/sbin /usr/bin /sbin /bin
 
-# vcs_info を RPROMPT に表示
-zstyle ':vcs_info:*' formats '%F{green}(%s)-[%b]%f'
-zstyle ':vcs_info:*' actionformats '%F{red}(%s)-[%b|%a]%f'
-function _update_vcs_info_msg() {
-  LANG=en_US.UTF-8 vcs_info
-  RPROMPT="${vcs_info_msg_0_}"
-}
-add-zsh-hook precmd _update_vcs_info_msg
+# プロンプトは starship に委譲する（git 表示も starship 側で行うため
+# zsh の vcs_info は使わない）。
 
 # よく使うエイリアス
 alias ..='cd ..'
@@ -46,6 +40,13 @@ alias rm='rm -i'
 alias cp='cp -i'
 alias mv='mv -i'
 
+# モダン CLI への置き換え（インストールされている場合のみ）
+command -v bat   >/dev/null 2>&1 && alias cat='bat'
+command -v procs >/dev/null 2>&1 && alias top='procs' && alias ps='procs'
+command -v dust  >/dev/null 2>&1 && alias du='dust'
+command -v fd    >/dev/null 2>&1 && alias find='fd'
+command -v sd    >/dev/null 2>&1 && alias sed='sd'
+
 # グローバルエイリアス
 alias -g L='| less'
 alias -g G='| grep'
@@ -53,11 +54,58 @@ alias -g G='| grep'
 # PATH やツールの初期化はここに追記
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.local/bin:$PATH"
 
-# 例：必要なら有効化
-# eval "$(rbenv init -)"
-# eval "$(direnv hook zsh)"
-# eval "$(starship init zsh)"
-# eval "$(zoxide init zsh)"
+# Go プロジェクトのパス（`cd $atami` のように移動先として使う）
+export fastmedia="$HOME/go/src/github.com/fastmedia"
+export atami="$fastmedia/atami"
+export kurobe="$fastmedia/kurobe"
+export cms="$fastmedia/cms"
+export nginx="$fastmedia/nginx"
+export protobuf="$fastmedia/protobuf"
+export hakone="$fastmedia/hakone"
+export batch="$fastmedia/batch"
+export beppu="$fastmedia/beppu"
+export shirahama="$fastmedia/shirahama"
+export tattsum="$HOME/go/src/github.com/Tattsum"
+export haul="$HOME/go/src/github.com/haul-inc"
+
+# 作業用ディレクトリ
+export KUROBE_DIR="$HOME/kurobe-data"
+
+# プロンプト（starship）を初期化
+eval "$(starship init zsh)"
+
+# ツールの初期化（インストールされている場合のみ。未導入マシンでもエラーにしない）
+command -v rbenv  >/dev/null 2>&1 && eval "$(rbenv init - zsh)"
+command -v direnv >/dev/null 2>&1 && eval "$(direnv hook zsh)"
+command -v zoxide >/dev/null 2>&1 && eval "$(zoxide init zsh)"
+command -v mcfly  >/dev/null 2>&1 && eval "$(mcfly init zsh)"   # 履歴検索（Ctrl-R）
+
+# pyenv
+if command -v pyenv >/dev/null 2>&1; then
+  export PYENV_ROOT="$HOME/.pyenv"
+  export PATH="$PYENV_ROOT/shims:$PATH"
+  eval "$(pyenv init - zsh)"
+fi
+
+# nodebrew
+[[ -d "$HOME/.nodebrew/current/bin" ]] && export PATH="$HOME/.nodebrew/current/bin:$PATH"
+
+# nvm
+export NVM_DIR="$HOME/.nvm"
+[[ -s "/opt/homebrew/opt/nvm/nvm.sh" ]] && source "/opt/homebrew/opt/nvm/nvm.sh"
+
+# Google Cloud SDK（Homebrew Cask 版の path/補完。formula 版は PATH に既に入っている）
+[[ -f '/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc' ]] \
+  && source '/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
+[[ -f '/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc' ]] \
+  && source '/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/completion.zsh.inc'
+
+# hstr（履歴検索。Ctrl-R は mcfly が使うため hh で起動する）
+if command -v hstr >/dev/null 2>&1; then
+  alias hh='hstr'
+  export HSTR_CONFIG=hicolor
+  setopt hist_ignore_space
+fi
 
 # ローカル専用の機密設定は ~/.zshrc.local に切り出す
 if [[ -f "$HOME/.zshrc.local" ]]; then

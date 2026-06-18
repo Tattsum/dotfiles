@@ -80,6 +80,12 @@ echo "🚀 ide スクリプトをリンクします..."
 echo "------------------------------"
 link_file "$DOTFILES_DIR/bin/ide" "$HOME/.local/bin/ide"
 
+echo ""
+echo "------------------------------"
+echo "⭐ starship の設定をリンクします..."
+echo "------------------------------"
+link_file "$DOTFILES_DIR/starship/starship.toml" "$HOME/.config/starship.toml"
+
 # tmux / vim / Gemini / Codex などは、設定ファイルを追加したタイミングで
 # この下に同様の `link_file` 呼び出しを追記していく運用を想定しています。
 # 例）tmux:
