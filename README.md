@@ -40,6 +40,13 @@ zellij をベースにしたターミナル IDE 環境を管理しています�
 これらは `install.sh` 実行時に `~/.config/zellij`・`~/.config/helix`・`~/.local/bin` 配下へシンボリックリンクされます。
 `bin/ide` を使うには `~/.local/bin` が `PATH` に含まれている必要があります。
 
+## その他のツール設定
+
+- `git/.gitignore_global` — git のグローバル除外設定（`.gitconfig` の `core.excludesfile` が参照）
+- `kitty/` — kitty ターミナルの設定一式（`kitty.conf`・テーマ・スクリプト）。`~/.config/kitty/` 配下へ個別にリンク
+- `zed/settings.json` — Zed エディタの個人設定
+- `gh/config.yml` — GitHub CLI の設定。**注意**: `gh` は設定変更時にこのファイルを置き換えることがあり、その際 symlink が解除される。気づいたら `./install.sh` を再実行する
+
 ## Cursor / Skills（汎用テンプレ）
 
 - **汎用 `.cursorrules`**

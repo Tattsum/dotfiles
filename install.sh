@@ -86,6 +86,34 @@ echo "⭐ starship の設定をリンクします..."
 echo "------------------------------"
 link_file "$DOTFILES_DIR/starship/starship.toml" "$HOME/.config/starship.toml"
 
+echo ""
+echo "------------------------------"
+echo "⚙️ git のグローバル除外設定をリンクします..."
+echo "------------------------------"
+link_file "$DOTFILES_DIR/git/.gitignore_global" "$HOME/.gitignore_global"
+
+echo ""
+echo "------------------------------"
+echo "🐱 kitty の設定をリンクします..."
+echo "------------------------------"
+for kitty_file in "$DOTFILES_DIR"/kitty/*; do
+  link_file "$kitty_file" "$HOME/.config/kitty/$(basename "$kitty_file")"
+done
+
+echo ""
+echo "------------------------------"
+echo "⚡ Zed の設定をリンクします..."
+echo "------------------------------"
+link_file "$DOTFILES_DIR/zed/settings.json" "$HOME/.config/zed/settings.json"
+
+echo ""
+echo "------------------------------"
+echo "🐙 gh (GitHub CLI) の設定をリンクします..."
+echo "------------------------------"
+# 注意: gh は設定変更時にこのファイルを置き換える（atomic rename）ことがあり、
+# その場合 symlink が解除され実ファイルに戻る。気づいたら ./install.sh を再実行する。
+link_file "$DOTFILES_DIR/gh/config.yml" "$HOME/.config/gh/config.yml"
+
 # tmux / vim / Gemini / Codex などは、設定ファイルを追加したタイミングで
 # この下に同様の `link_file` 呼び出しを追記していく運用を想定しています。
 # 例）tmux:

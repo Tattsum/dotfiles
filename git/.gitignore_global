@@ -1,0 +1,16 @@
+# OS生成ファイル
+.DS_Store
+Thumbs.db
+
+# IDE設定ファイル
+.idea/
+.vscode/
+
+# 環境変数ファイル
+.env
+.envrc
+.claude/*
+.gemini/*
+
+
+**/.claude/settings.local.json
