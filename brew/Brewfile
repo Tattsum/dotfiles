@@ -1,0 +1,316 @@
+tap "budougumi0617/tap"
+tap "bufbuild/buf"
+tap "filosottile/musl-cross"
+tap "go-delve/delve"
+tap "go-task/tap"
+# Run your GitHub Actions locally
+brew "act"
+# Simple, modern, secure file encryption
+brew "age"
+# Cryptography and SSL/TLS Toolkit
+brew "openssl@3"
+# Writes your git commit messages for you with AI
+brew "aicommits"
+# Securely store and access AWS credentials in development environments
+brew "aws-vault"
+# Official Amazon AWS command-line interface
+brew "awscli"
+# C library of Git core methods that is re-entrant and linkable
+brew "libgit2"
+# Clone of cat(1) with syntax highlighting and Git integration
+brew "bat"
+# XML-based font configuration API for X Windows
+brew "fontconfig"
+# Core application library for C
+brew "glib"
+# Decentralized dependency manager for Cocoa
+brew "carthage"
+# Enables you to reproduce the CircleCI environment locally
+brew "circleci"
+# Utility for connecting securely to your Cloud SQL instances
+brew "cloud-sql-proxy"
+# Load/unload environment variables based on $PWD
+brew "direnv"
+# Pack, ship and run any application as a lightweight container
+brew "docker", link: false
+# Isolated development environments using Docker
+brew "docker-compose"
+# Debian package management system
+brew "dpkg"
+# More intuitive version of du in rust
+brew "dust"
+# Simple, fast and user-friendly alternative to find
+brew "fd"
+# Command-line fuzzy finder written in Go
+brew "fzf"
+# Interact with Google Gemini AI models from the command-line
+brew "gemini-cli"
+# GitHub command-line tool
+brew "gh"
+# Distributed revision control system
+brew "git"
+# Syntax-highlighting pager for git and diff output
+brew "git-delta"
+# Prevents you from committing sensitive information to a git repo
+brew "git-secrets"
+# Blazing fast terminal-ui for git written in rust
+brew "gitui"
+# Open source programming language to build simple/reliable/efficient software
+brew "go"
+# Go implementation of configuration language for defining JSON data
+brew "go-jsonnet"
+# Database migrations CLI tool
+brew "golang-migrate"
+# GNU grep, egrep and fgrep
+brew "grep"
+# Interactive web UI for gRPC, along the lines of postman
+brew "grpcui"
+# Like cURL, but for gRPC
+brew "grpcurl"
+# OpenType text shaping engine
+brew "harfbuzz"
+# Post-modern modal text editor
+brew "helix"
+# Command-line hex viewer
+brew "hexyl"
+# Bash and zsh history suggest box
+brew "hstr"
+# Image format providing lossless and lossy compression for web images
+brew "webp"
+# Tools and libraries to manipulate images in select formats
+brew "imagemagick"
+# JQ clone focussed on correctness, speed, and simplicity
+brew "jaq"
+# Lightweight and flexible command-line JSON processor
+brew "jq"
+# Development kit for the Java programming language
+brew "openjdk"
+# Java-based project management
+brew "maven"
+# Fly through your shell history
+brew "mcfly"
+# Simple tool to make locally trusted development certificates
+brew "mkcert"
+# Open source relational database management system
+brew "mysql-client"
+# Network Kanji code conversion Filter (NKF)
+brew "nkf"
+# Package compiler and linker metadata toolkit
+brew "pkgconf"
+# Install NodeJS versions
+brew "node-build"
+# Node.js version manager
+brew "nodebrew"
+# Manage multiple Node.js versions
+brew "nvm"
+# Simple CLI for interacting with Google oauth tokens
+brew "oauth2l"
+# Okta federated identity for AWS CLI
+brew "okta-aws-cli"
+# Development kit for the Java programming language
+brew "openjdk@11"
+# Simplistic interactive filtering tool
+brew "peco"
+# Object-relational database system
+brew "postgresql@18", link: true
+# Modern replacement for ps written in Rust
+brew "procs"
+# Protocol buffers (Google's data interchange format)
+brew "protobuf"
+# Python version management
+brew "pyenv"
+# Interpreted, interactive, object-oriented programming language
+brew "python@3.12"
+# Ruby version manager
+brew "rbenv"
+# Persistent key-value database, with built-in net interface
+brew "redis"
+# Search tool like grep and The Silver Searcher
+brew "ripgrep"
+# Safe, concurrent, practical language
+brew "rust"
+# Rust toolchain installer
+brew "rustup"
+# Intuitive find & replace CLI
+brew "sd"
+# Static analysis and lint tool, for (ba)sh scripts
+brew "shellcheck"
+# Editor of encrypted files
+brew "sops"
+# Cross-shell prompt for astronauts
+brew "starship"
+# User interface to the TELNET protocol
+brew "telnet"
+# OCR (Optical Character Recognition) engine
+brew "tesseract"
+# Terraform version manager inspired by rbenv
+brew "tfenv"
+# Text interface for Git repositories
+brew "tig"
+# Terminal multiplexer
+brew "tmux"
+# Program that allows you to count code, quickly
+brew "tokei"
+# Display directories as trees (with optional color/HTML output)
+brew "tree"
+# Command-line tool for sharing terminal over the web
+brew "ttyd"
+# Validating, recursive, caching DNS resolver
+brew "unbound"
+# Vi 'workalike' with many additional features
+brew "vim"
+# Internet file retriever
+brew "wget"
+# PDF viewer
+brew "xpdf"
+# Blazing fast terminal file manager written in Rust, based on async I/O
+brew "yazi"
+# Pluggable terminal workspace, with terminal multiplexer as the base feature
+brew "zellij"
+# Shell extension to navigate your filesystem faster
+brew "zoxide"
+# UNIX shell (command interpreter)
+brew "zsh"
+# Command-line interface for 1Password
+cask "1password-cli"
+# OpenAI's official ChatGPT desktop app
+cask "chatgpt"
+# OpenAI's official browser with ChatGPT built in
+cask "chatgpt-atlas"
+# Anthropic's official Claude AI desktop app
+cask "claude"
+# Terminal-based AI coding assistant
+cask "claude-code"
+# Clipboard extension app
+cask "clipy"
+# OpenAI's coding agent that runs in your terminal
+cask "codex"
+# Write, edit, and chat about your code with AI
+cask "cursor"
+# App to build and share containerised applications and microservices
+cask "docker-desktop"
+# Collaborative team software
+cask "figma"
+# UI toolkit for building applications for mobile, web and desktop
+cask "flutter"
+cask "font-0xproto-nerd-font"
+cask "font-3270-nerd-font"
+cask "font-agave-nerd-font"
+cask "font-anonymice-nerd-font"
+cask "font-arimo-nerd-font"
+cask "font-aurulent-sans-mono-nerd-font"
+cask "font-bigblue-terminal-nerd-font"
+cask "font-bitstream-vera-sans-mono-nerd-font"
+cask "font-blex-mono-nerd-font"
+cask "font-caskaydia-cove-nerd-font"
+cask "font-caskaydia-mono-nerd-font"
+cask "font-code-new-roman-nerd-font"
+cask "font-comic-shanns-mono-nerd-font"
+cask "font-commit-mono-nerd-font"
+cask "font-cousine-nerd-font"
+cask "font-d2coding-nerd-font"
+cask "font-daddy-time-mono-nerd-font"
+cask "font-dejavu-sans-mono-nerd-font"
+cask "font-droid-sans-mono-nerd-font"
+cask "font-envy-code-r-nerd-font"
+cask "font-fantasque-sans-mono-nerd-font"
+cask "font-fira-code"
+cask "font-fira-code-nerd-font"
+cask "font-fira-mono-nerd-font"
+cask "font-geist-mono-nerd-font"
+cask "font-go-mono-nerd-font"
+cask "font-gohufont-nerd-font"
+cask "font-hack-nerd-font"
+cask "font-hackgen"
+cask "font-hackgen-nerd"
+cask "font-hasklug-nerd-font"
+cask "font-heavy-data-nerd-font"
+cask "font-hurmit-nerd-font"
+cask "font-im-writing-nerd-font"
+cask "font-inconsolata-go-nerd-font"
+cask "font-inconsolata-lgc-nerd-font"
+cask "font-inconsolata-nerd-font"
+cask "font-intone-mono-nerd-font"
+cask "font-iosevka"
+cask "font-iosevka-nerd-font"
+cask "font-iosevka-term-nerd-font"
+cask "font-iosevka-term-slab-nerd-font"
+cask "font-jetbrains-mono-nerd-font"
+cask "font-lekton-nerd-font"
+cask "font-liberation-nerd-font"
+cask "font-lilex-nerd-font"
+cask "font-m+-nerd-font"
+cask "font-martian-mono-nerd-font"
+cask "font-meslo-lg-nerd-font"
+cask "font-migu-1m"
+cask "font-monaspice-nerd-font"
+cask "font-monocraft-nerd-font"
+cask "font-monofur-nerd-font"
+cask "font-monoid-nerd-font"
+cask "font-mononoki-nerd-font"
+cask "font-noto-nerd-font"
+cask "font-opendyslexic-nerd-font"
+cask "font-overpass-nerd-font"
+cask "font-profont-nerd-font"
+cask "font-proggy-clean-tt-nerd-font"
+cask "font-recursive-mono-nerd-font"
+cask "font-ricty-diminished"
+cask "font-roboto-mono-nerd-font"
+cask "font-sauce-code-pro-nerd-font"
+cask "font-shure-tech-mono-nerd-font"
+cask "font-space-mono-nerd-font"
+cask "font-symbols-only-nerd-font"
+cask "font-terminess-ttf-nerd-font"
+cask "font-tinos-nerd-font"
+cask "font-ubuntu-mono-nerd-font"
+cask "font-ubuntu-nerd-font"
+cask "font-ubuntu-sans-nerd-font"
+cask "font-victor-mono-nerd-font"
+cask "font-zed-mono-nerd-font"
+# Set of tools to manage resources and applications hosted on Google Cloud
+cask "gcloud-cli"
+# Japanese input software
+cask "google-japanese-ime"
+# Desktop automation application
+cask "hammerspoon"
+# Testing client for REST, GraphQL, and HTTP APIs
+cask "httpie-desktop"
+# Agent-centric IDE with spec-driven development
+cask "kiro"
+# AI-powered productivity tool for the command-line
+cask "kiro-cli"
+# GPU-based terminal emulator
+cask "kitty"
+# App to write, plan, collaborate, and get organised
+cask "notion"
+# Calendar for professionals and teams
+cask "notion-calendar"
+# Music streaming service
+cask "spotify"
+# Native GUI tool for relational databases
+cask "tableplus"
+# Open-source code editor
+cask "visual-studio-code"
+# Web browser with built-in email client focusing on customization and control
+cask "vivaldi"
+# Multiplayer code editor
+cask "zed"
+go "github.com/rhysd/actionlint/cmd/actionlint"
+go "github.com/go-delve/delve/cmd/dlv"
+go "github.com/766b/go-outliner"
+go "mvdan.cc/gofumpt"
+go "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
+go "github.com/haya14busa/goplay/cmd/goplay"
+go "golang.org/x/tools/gopls"
+go "github.com/cweill/gotests/gotests"
+go "github.com/99designs/gqlgen"
+go "github.com/josharian/impl"
+go "github.com/evilmartians/lefthook/v2"
+go "connectrpc.com/connect/cmd/protoc-gen-connect-go"
+go "google.golang.org/protobuf/cmd/protoc-gen-go"
+go "google.golang.org/grpc/cmd/protoc-gen-go-grpc"
+go "github.com/skanehira/rtty"
+go "honnef.co/go/tools/cmd/staticcheck"
+cargo "sshx"
+npm "corepack"
+npm "markdownlint-cli"

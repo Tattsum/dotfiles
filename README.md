@@ -47,6 +47,20 @@ zellij をベースにしたターミナル IDE 環境を管理しています�
 - `zed/settings.json` — Zed エディタの個人設定
 - `gh/config.yml` — GitHub CLI の設定。**注意**: `gh` は設定変更時にこのファイルを置き換えることがあり、その際 symlink が解除される。気づいたら `./install.sh` を再実行する
 
+## Homebrew パッケージ（Brewfile）
+
+- `brew/Brewfile` に formula・cask・tap を記録しています（`brew bundle dump` で生成）。
+- `install.sh` 実行時、`brew` があれば `brew bundle install` で未導入のものをまとめてインストールします（冪等）。
+- **パッケージを追加・削除したら Brewfile を更新する**:
+  ```sh
+  brew bundle dump --force --file=brew/Brewfile
+  ```
+- 不要になったパッケージを Brewfile に揃えて削除したい場合（Brewfile に無いものをアンインストール）:
+  ```sh
+  brew bundle cleanup --file=brew/Brewfile        # 削除対象の確認
+  brew bundle cleanup --force --file=brew/Brewfile  # 実行
+  ```
+
 ## Cursor / Skills（汎用テンプレ）
 
 - **汎用 `.cursorrules`**

@@ -124,5 +124,16 @@ link_file "$DOTFILES_DIR/gh/config.yml" "$HOME/.config/gh/config.yml"
 # link_file "$DOTFILES_DIR/tmux/.tmux.conf" "$HOME/.tmux.conf"
 
 echo ""
+echo "------------------------------"
+echo "🍺 Homebrew パッケージ（Brewfile）を適用します..."
+echo "------------------------------"
+if command -v brew >/dev/null 2>&1; then
+  # 冪等。インストール済みは skip され、未導入の formula/cask/tap のみ入る。
+  brew bundle install --file="$DOTFILES_DIR/brew/Brewfile"
+else
+  echo "  ⏭ brew が見つからないためスキップ（https://brew.sh からインストール後に再実行）"
+fi
+
+echo ""
 echo "✅ セットアップ完了！"
 
