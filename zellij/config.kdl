@@ -1,0 +1,8 @@
+default_layout "ide"
+
+// セッションのシリアライズ（復元）を無効化する。
+// 有効だと EXITED セッションを attach 時に復元するが、復元では command ペイン（hx）が
+// 自動実行されず「Editor が閉じた状態」で開いてしまう。無効化することで、セッションが
+// 消えた後の `ide` 実行時に毎回 ide レイアウトで新規作成され、hx が起動した状態で開く。
+session_serialization false
+

@@ -1,0 +1,39 @@
+#!/bin/bash
+
+# macOS の Unix socket パス上限（sun_path = 104 byte）対策。
+# デフォルトの $TMPDIR は長く、zellij の socket dir がパスを圧迫してセッション名が
+# ~24 字に制限される（超えると "session name must be less than 0 characters"）。
+# 短い socket dir に固定して回避する。.zshrc の値と一致させること。
+export ZELLIJ_SOCKET_DIR="${ZELLIJ_SOCKET_DIR:-/tmp/zellij-$(id -u)}"
+
+selected=$(fd -H -t d -d 3 '^\.git$' "$HOME/go/src/github.com" 2>/dev/null | xargs -n1 dirname | sort -u | fzf --prompt="Project > ")
+
+if [[ -z "$selected" ]]; then
+    echo "No project selected"
+    exit 0
+fi
+
+project_name=$(basename "$selected")
+branch=$(cd "$selected" && git branch --show-current 2>/dev/null || echo "main")
+
+# ブランチ種別のみを抽出してセッション名を作成
+# Unixソケットパスの制限（108バイト）を回避するため、セッション名は短くする
+branch_type=""
+if [[ "$branch" =~ ^(deploy|feature|fix|hotfix|bugfix|release|refactor|chore|docs|test)([/-]|$) ]]; then
+    branch_type="${BASH_REMATCH[1]}"
+elif [[ "$branch" =~ ^(main|master|develop|dev|staging|production|prod)$ ]]; then
+    branch_type="$branch"
+else
+    # その他の場合は最初の単語または最初の10文字を使用
+    branch_type=$(echo "$branch" | cut -d'-' -d'/' -f1 | head -c 10)
+fi
+
+session_name="${project_name}-${branch_type}"
+
+if [[ -n "$ZELLIJ" ]]; then
+    zellij action detach
+fi
+
+cd "$selected"
+zellij attach "$session_name" 2>/dev/null || zellij -s "$session_name"
+

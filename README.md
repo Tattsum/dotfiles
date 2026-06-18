@@ -27,6 +27,19 @@ dotfiles 管理用リポジトリです。
 
 この README と `install.sh` をベースに、必要な設定を少しずつ追加していく想定です。
 
+## ターミナル IDE 環境（zellij + helix + yazi）
+
+zellij をベースにしたターミナル IDE 環境を管理しています。
+
+- `zellij/config.kdl` — zellij のデフォルトレイアウトを `ide` に設定
+- `zellij/layouts/ide.kdl` — Editor / Implement / Review ペインからなる IDE レイアウト
+- `helix/config.toml` — helix のキーマップ（`C-y` で yazi をフローティング起動）
+- `helix/yazi-picker.sh` — yazi で選択したファイルを helix で開くためのスクリプト
+- `bin/ide` — プロジェクト選択 → zellij セッション attach を行う起動スクリプト（`~/.local/bin/ide` にリンク）
+
+これらは `install.sh` 実行時に `~/.config/zellij`・`~/.config/helix`・`~/.local/bin` 配下へシンボリックリンクされます。
+`bin/ide` を使うには `~/.local/bin` が `PATH` に含まれている必要があります。
+
 ## Cursor / Skills（汎用テンプレ）
 
 - **汎用 `.cursorrules`**

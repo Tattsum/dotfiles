@@ -60,6 +60,26 @@ echo "🗂 yazi の設定をリンクします..."
 echo "------------------------------"
 link_file "$DOTFILES_DIR/yazi/yazi.toml" "$HOME/.config/yazi/yazi.toml"
 
+echo ""
+echo "------------------------------"
+echo "🧱 zellij の設定をリンクします..."
+echo "------------------------------"
+link_file "$DOTFILES_DIR/zellij/config.kdl" "$HOME/.config/zellij/config.kdl"
+link_file "$DOTFILES_DIR/zellij/layouts/ide.kdl" "$HOME/.config/zellij/layouts/ide.kdl"
+
+echo ""
+echo "------------------------------"
+echo "✏️ helix の設定をリンクします..."
+echo "------------------------------"
+link_file "$DOTFILES_DIR/helix/config.toml" "$HOME/.config/helix/config.toml"
+link_file "$DOTFILES_DIR/helix/yazi-picker.sh" "$HOME/.config/helix/yazi-picker.sh"
+
+echo ""
+echo "------------------------------"
+echo "🚀 ide スクリプトをリンクします..."
+echo "------------------------------"
+link_file "$DOTFILES_DIR/bin/ide" "$HOME/.local/bin/ide"
+
 # tmux / vim / Gemini / Codex などは、設定ファイルを追加したタイミングで
 # この下に同様の `link_file` 呼び出しを追記していく運用を想定しています。
 # 例）tmux:
