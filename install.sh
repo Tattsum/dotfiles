@@ -54,6 +54,12 @@ echo "📝 Cursor の設定をリンクします..."
 echo "------------------------------"
 link_file "$DOTFILES_DIR/cursor/cursor.toml" "$HOME/.config/cursor/cursor.toml"
 
+echo ""
+echo "------------------------------"
+echo "🗂 yazi の設定をリンクします..."
+echo "------------------------------"
+link_file "$DOTFILES_DIR/yazi/yazi.toml" "$HOME/.config/yazi/yazi.toml"
+
 # tmux / vim / Gemini / Codex などは、設定ファイルを追加したタイミングで
 # この下に同様の `link_file` 呼び出しを追記していく運用を想定しています。
 # 例）tmux:
