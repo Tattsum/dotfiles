@@ -11,6 +11,7 @@ Review テスト命名・構造.
 - プリミティブ（int/string/bool/null）・同一インスタンス比較は `assertSame()`、配列・オブジェクトの構造的等価性は `assertEquals()` を使い分けているか。
 - 時刻は `Carbon::setTestNow()` / `CarbonImmutable::setTestNow()` で固定し、`now()` 等の現在時刻を直接使っていないか。
 - arrange で型付きの共通 Factory / Helper を活用しているか。推論が弱い生成（`factory()->create()` 等）に `@var` で型を補っているか。
+- 単一テストクラスでしか使わないテスト専用ヘルパーを、広く共有される共通 Helper クラスに足していないか。そのテストクラス内の private メソッドとして実装し、共有 Helper の汚染を避けてカプセル化しているか（複数クラスで再利用する場合のみ共通 Helper に置く）。
 
 Report only concrete test-readability or correctness risks.
 

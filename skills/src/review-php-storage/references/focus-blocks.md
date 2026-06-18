@@ -13,6 +13,7 @@ Review マイグレーション・スキーマ設計.
 - 文字コードは `utf8mb4` ＋適切な COLLATE（`utf8` / `utf8mb3` は不可）。判定: 濁点区別不要→`utf8mb4_0900_ai_ci` / 多言語重要→`utf8mb4_unicode_ci` / それ以外→`utf8mb4_general_ci`。大小区別不要なカラムに `utf8mb4_bin` を使っていないか。
 - 固定長でない文字列は `VARCHAR(255)`、固定長不変値（UUID 等）のみ `CHAR(36)`。時刻は `DATETIME`（`TIMESTAMP` は 2038 年問題で不可）、`created_at`/`updated_at` は `CURRENT_TIMESTAMP` / `ON UPDATE CURRENT_TIMESTAMP` の定型。
 - 既知の値が必ず入るカラムは `NOT NULL` ＋デフォルト。アプリから明示的に入れる値に不要な DEFAULT を設定していないか。JSON 配列の DEFAULT は `[]` か。ライフサイクル status は ENUM / CHECK 制約を検討しているか。
+- 意図がカラム名だけでは読み取れないカラム・テーブルに、用途を説明するコメント（`->comment(...)` / `COMMENT '...'`）を付けているか。スキーマ自体がドキュメントとして機能し、後からカラムの意味を追えるようになっているか。
 
 Report only concrete schema risks visible in the changed migrations.
 
