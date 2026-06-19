@@ -112,6 +112,9 @@ if [[ -f "$HOME/.zshrc.local" ]]; then
   source "$HOME/.zshrc.local"
 fi
 
+# peco で ~/.ssh/conf.d/*-dev.config の接続先を選んで ssh する
+alias sshp='grep Match ~/.ssh/conf.d/*-dev.config | awk '\''{print $3, $7}'\'' | peco | awk '\''{print $1}'\'' | xargs -o -n 1 ssh'
+
 # Kiro CLI post block. Keep at the bottom of this file.
 [[ -f "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh" ]] && builtin source "${HOME}/Library/Application Support/kiro-cli/shell/zshrc.post.zsh"
 
