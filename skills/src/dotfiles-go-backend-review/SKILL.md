@@ -1,6 +1,6 @@
 ---
 name: dotfiles-go-backend-review
-description: Go バックエンド（handler / usecase / entity・domain / infrastructure のレイヤー構成）の差分をレビューするとき。Clean Architecture・gRPC の複数観点で漏れなく確認し、コードは修正せず重要度別の指摘リストを報告する。
+description: Go バックエンドの差分を、サブエージェントを使わず main 1コンテキストでざっと一括レビューする軽量・単発版。Clean Architecture・gRPC の複数観点を1回で確認し、コードは修正せず重要度別の指摘リストを報告する。「Go を軽くレビュー」「Go をざっと見て」等で発動。観点ごとにサブエージェントを並列起動して網羅的に見たいときは dotfiles-go-review（オーケストレーター）、個別観点だけなら review-go-* を使う。
 ---
 
 ## 目的

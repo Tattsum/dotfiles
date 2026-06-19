@@ -16,7 +16,8 @@ skills/
 ├── Makefile
 └── src/
     ├── dotfiles-commit-push/SKILL.md
-    ├── dotfiles-go-backend-review/SKILL.md
+    ├── dotfiles-go-backend-review/SKILL.md     # Go レビューの軽量・単発版（サブエージェント無し）
+    ├── dotfiles-go-review/SKILL.md             # Go レビューのオーケストレーター（4観点=10サブエージェントを並列起動）
     ├── dotfiles-lint-and-test/SKILL.md
     ├── dotfiles-php-laravel-lint-test/SKILL.md
     ├── dotfiles-php-laravel-review/SKILL.md   # PHP/Laravel レビューのオーケストレーター（5観点を並列起動）
