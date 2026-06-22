@@ -52,7 +52,7 @@ alias -g L='| less'
 alias -g G='| grep'
 
 # PATH やツールの初期化はここに追記
-export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.local/bin:$PATH"
+export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.local/bin:$HOME/go/bin:$PATH"
 
 # Go プロジェクトのパス（`cd $atami` のように移動先として使う）
 export fastmedia="$HOME/go/src/github.com/fastmedia"
