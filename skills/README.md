@@ -16,6 +16,7 @@ skills/
 ├── Makefile
 └── src/
     ├── dotfiles-commit-push/SKILL.md
+    ├── dotfiles-pr-create/SKILL.md             # push 済みブランチから PR を作成（既定 draft, base 自動判定）
     ├── dotfiles-go-backend-review/SKILL.md     # Go レビューの軽量・単発版（サブエージェント無し）
     ├── dotfiles-go-review/SKILL.md             # Go レビューのオーケストレーター（4観点=10サブエージェントを並列起動）
     ├── dotfiles-lint-and-test/SKILL.md
