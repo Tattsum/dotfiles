@@ -28,15 +28,19 @@ link_file "$DOTFILES_DIR/claude/subagent-statusline.sh" "$HOME/.claude/subagent-
 
 echo ""
 echo "------------------------------"
-echo "🧩 Claude Code のグローバル skill をリンクします..."
+echo "🧩 Claude Code / Cursor のグローバル skill をリンクします..."
 echo "------------------------------"
-mkdir -p "$HOME/.claude/skills"
+# skills/src を正本とし、Claude Code と Cursor の両方へ同じ skill を symlink する。
+# これにより両ツールで同一の skill を使い回せる（編集の正本は skills/src のみ）。
+mkdir -p "$HOME/.claude/skills" "$HOME/.cursor/skills"
 for skill_dir in "$DOTFILES_DIR"/skills/src/*/; do
   [ -d "$skill_dir" ] || continue
   skill_name="$(basename "$skill_dir")"
   # ディレクトリリンクは -n を付けて既存リンク先への潜り込みを防ぐ
   ln -sfn "$skill_dir" "$HOME/.claude/skills/$skill_name"
+  ln -sfn "$skill_dir" "$HOME/.cursor/skills/$skill_name"
   echo "  ✅ $HOME/.claude/skills/$skill_name -> $skill_dir"
+  echo "  ✅ $HOME/.cursor/skills/$skill_name -> $skill_dir"
 done
 
 echo ""
