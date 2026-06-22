@@ -10,48 +10,61 @@
 
 ## レイアウト
 
+`src/` 配下が編集の正本。各スキルは `SKILL.md` を持ち、重い詳細は `references/`（または同階層の補助 `.md`）に退避して必要時のみ読み込ませる。
+
 ```
 skills/
 ├── README.md
 ├── Makefile
 └── src/
-    ├── dotfiles-commit-push/SKILL.md
+    ├── dotfiles-plan-first/SKILL.md            # 実装着手前の標準WF（調査→技術選定→検証→/grill-me合意→実装）
+    ├── dotfiles-commit-push/SKILL.md           # 秘密情報チェック + コミット規約を強制して commit / push
     ├── dotfiles-pr-create/SKILL.md             # push 済みブランチから PR を作成（既定 draft, base 自動判定）
-    ├── dotfiles-go-backend-review/SKILL.md     # Go レビューの軽量・単発版（サブエージェント無し）
+    ├── dotfiles-lint-and-test/SKILL.md         # リポジトリ標準の lint / format / test を特定して実行
+    ├── dotfiles-php-laravel-lint-test/SKILL.md # PHP/Laravel の lint / 静的解析 / test を実行
+    ├── dotfiles-security-performance/SKILL.md  # セキュリティ + パフォーマンスを Must/Should/Nice で指摘
     ├── dotfiles-go-review/SKILL.md             # Go レビューのオーケストレーター（4観点=10サブエージェントを並列起動）
-    ├── dotfiles-lint-and-test/SKILL.md
-    ├── dotfiles-php-laravel-lint-test/SKILL.md
-    ├── dotfiles-php-laravel-review/SKILL.md   # PHP/Laravel レビューのオーケストレーター（5観点を並列起動）
-    ├── dotfiles-security-performance/SKILL.md
-    ├── review-go-architecture/
+    ├── dotfiles-php-laravel-review/SKILL.md    # PHP/Laravel レビューのオーケストレーター（5観点を並列起動）
+    ├── review-go-architecture/                 # Go: アーキテクチャ / レイヤー責務（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── review-go-idioms/
+    ├── review-go-idioms/                        # Go: イディオム / 型安全 / 命名（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── review-go-storage/
+    ├── review-go-storage/                       # Go: DB / クエリ性能 / 外部I/O（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── review-go-test/
+    ├── review-go-test/                          # Go: テスト戦略 / テスト品質（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── review-php-architecture/
+    ├── review-php-architecture/                 # PHP: レイヤー責務 / 設計（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── review-php-idioms/
+    ├── review-php-idioms/                        # PHP: イディオム / 型安全 / 命名（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── review-php-storage/
+    ├── review-php-storage/                       # PHP: DB / クエリ性能（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── review-php-test/
+    ├── review-php-test/                          # PHP: テスト命名・構造 / 品質（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── review-php-security/
+    ├── review-php-security/                      # PHP: インジェクション / 認可 / 機微情報（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    └── devin-task-triage/SKILL.md
+    ├── review-skill-security/                    # 外部 Skill をインストール前にセキュリティ静的解析
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
+    ├── improve-codebase-architecture/           # 深掘り候補を発見→HTMLレポート→grilling（オーケストレーター）
+    │   ├── SKILL.md
+    │   ├── LANGUAGE.md
+    │   ├── HTML-REPORT.md
+    │   ├── DEEPENING.md
+    │   └── INTERFACE-DESIGN.md
+    └── devin-task-triage/SKILL.md              # 開発タスクを Devin 送り / ここで処理 に振り分け
 ```
+
+> `prompt-pattern-scan` は `~/.claude/skills/` 直下のみで運用しており、この `src/` 管理対象外。
 
 ## コマンド
 

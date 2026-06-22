@@ -35,11 +35,13 @@ This skill is _informed_ by the project's domain model. The domain language give
 
 ## Process
 
-### 1. Explore
+This skill runs as an **orchestrator**. The two heavy, self-contained concerns — scanning the codebase and authoring the HTML report — are each delegated to a dedicated subagent that returns a compact result. Only the interactive grilling stays in the main context. This keeps the full codebase scan and the HTML scaffold out of the main context and keeps each concern isolated.
 
-Read the project's domain glossary and any ADRs in the area you're touching first.
+Before dispatching anything, read (in the main context) the project's domain glossary (`CONTEXT.md`) and any ADRs in the area being touched. These are small, orient the whole run, and must be passed to both subagents so candidates use domain vocabulary and skip ADR-settled decisions.
 
-Then use the Agent tool with `subagent_type=Explore` to walk the codebase (scope to source directories such as `src/`, `lib/`, or equivalent — avoid scanning secrets, build artefacts, or config outside those roots). Don't follow rigid heuristics — explore organically and note where you experience friction:
+### 1. Explore — delegated to `Explore` subagent(s)
+
+Dispatch one or more `Explore` subagents (scope each to source directories such as `src/`, `lib/`, or equivalent — never scan secrets, build artefacts, or config outside those roots). Hand each subagent the glossary/ADR context and the deepening criteria below. Tell it to explore organically — not by rigid heuristics — and to report only friction it can back with evidence:
 
 - Where does understanding one concept require bouncing between many small modules?
 - Where are modules **shallow** — interface nearly as complex as the implementation?
@@ -47,36 +49,26 @@ Then use the Agent tool with `subagent_type=Explore` to walk the codebase (scope
 - Where do tightly-coupled modules leak across their seams?
 - Which parts of the codebase are untested, or hard to test through their current interface?
 
-Apply the **deletion test** to anything you suspect is shallow: would deleting it concentrate complexity, or just move it? A "yes, concentrates" is the signal you want.
+Require each subagent to apply the **deletion test** to anything it flags as shallow (would deleting it concentrate complexity, or just move it? — "concentrates" is the signal) and to return a **compact candidate list**, not raw file dumps. Each candidate carries: **Files** (involved modules), **Problem** (the friction), **Deletion-test result** (concentrates vs. just-moves, with reasoning), and **Suspected depth gain** (what gets deeper and why).
 
-### 2. Present candidates as an HTML report
+The orchestrator merges and dedupes candidates across subagents. Do NOT author the report or propose interfaces here.
 
-Write a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file. **Tell the user the absolute path and ask them to open it manually — do not run `open`, `xdg-open`, or `start` automatically.**
+### 2. Author the HTML report — delegated to a separate subagent
 
-The report uses **Tailwind via CDN** for layout and styling, and **Mermaid via CDN** for diagrams where a graph/flow/sequence reliably communicates the structure. Mix Mermaid with hand-crafted CSS/SVG visuals — use Mermaid when relationships are graph-shaped (call graphs, dependencies, sequences), and hand-built divs/SVG when you want something more editorial (mass diagrams, cross-sections, collapse animations). Each candidate gets a **before/after visualisation**. Be visual.
+Dispatch a single report-authoring subagent. Give it the merged candidate list, the `CONTEXT.md` domain vocabulary, the [LANGUAGE.md](LANGUAGE.md) architecture vocabulary, and [HTML-REPORT.md](HTML-REPORT.md) (the full scaffold). Isolating this in its own subagent is what keeps the large HTML/Tailwind/Mermaid authoring instructions out of the main context. Instruct the subagent to:
 
-For each candidate, the same template as before, but rendered as a card:
+- Write a self-contained HTML file to the OS temp directory so nothing lands in the repo. Resolve the temp dir from `$TMPDIR`, falling back to `/tmp` (or `%TEMP%` on Windows), and write to `<tmpdir>/architecture-review-<timestamp>.html` so each run gets a fresh file.
+- Render one card per candidate — **Files / Problem / Solution / Benefits / Before-After diagram / Recommendation strength** (`Strong` / `Worth exploring` / `Speculative`, as a badge) — using Tailwind for layout and Mermaid for graph-shaped relationships (call graphs, dependencies, sequences) mixed with hand-built CSS/SVG for more editorial visuals. Be visual; every candidate gets a before/after.
+- Express **Benefits** in terms of locality and leverage, and how tests would improve. Do NOT propose interfaces.
+- Use `CONTEXT.md` vocabulary for the domain and [LANGUAGE.md](LANGUAGE.md) vocabulary for the architecture: "the Order intake module," not "the FooBarHandler" and not "the Order service."
+- Flag **ADR conflicts** only when the friction is real enough to warrant revisiting the ADR, as a clear warning callout (_"contradicts ADR-0007 — but worth reopening because…"_). Don't enumerate every refactor an ADR forbids.
+- End with a **Top recommendation** section, then return **only the absolute path** of the written file plus the Top recommendation. It must NOT run `open`, `xdg-open`, or `start`.
 
-- **Files** — which files/modules are involved
-- **Problem** — why the current architecture is causing friction
-- **Solution** — plain English description of what would change
-- **Benefits** — explained in terms of locality and leverage, and how tests would improve
-- **Before / After diagram** — side-by-side, custom-drawn, illustrating the shallowness and the deepening
-- **Recommendation strength** — one of `Strong`, `Worth exploring`, `Speculative`, rendered as a badge
+The orchestrator then tells the user the absolute path, asks them to open it manually (never auto-open), and asks: "Which of these would you like to explore?"
 
-End the report with a **Top recommendation** section: which candidate you'd tackle first and why.
+### 3. Grilling loop — main context (interactive)
 
-**Use CONTEXT.md vocabulary for the domain, and [LANGUAGE.md](LANGUAGE.md) vocabulary for the architecture.** If `CONTEXT.md` defines "Order," talk about "the Order intake module" — not "the FooBarHandler," and not "the Order service."
-
-**ADR conflicts**: if a candidate contradicts an existing ADR, only surface it when the friction is real enough to warrant revisiting the ADR. Mark it clearly in the card (e.g. a warning callout: _"contradicts ADR-0007 — but worth reopening because…"_). Don't list every theoretical refactor an ADR forbids.
-
-See [HTML-REPORT.md](HTML-REPORT.md) for the full HTML scaffold, diagram patterns, and styling guidance.
-
-Do NOT propose interfaces yet. After the file is written, ask the user: "Which of these would you like to explore?"
-
-### 3. Grilling loop
-
-Once the user picks a candidate, drop into a grilling conversation. Walk the design tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
+This stays in the main context because it is an interactive back-and-forth with the user; do not delegate it. Once the user picks a candidate, drop into a grilling conversation. Walk the design tree with them — constraints, dependencies, the shape of the deepened module, what sits behind the seam, what tests survive.
 
 Side effects happen inline as decisions crystallize, but **always ask the user before writing to any file**:
 
