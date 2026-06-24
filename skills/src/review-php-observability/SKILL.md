@@ -1,29 +1,27 @@
 ---
-name: review-go-test
-description: Reviews Go backend diffs for test strategy, repository tests, integration tests, logic coverage, assertion quality, false negatives, boundary cases, and layer-appropriate verification. Use when the user asks for test review, test-quality review, coverage review, integration-test review, repository-test review, assertion review, or says 「テストをレビュー」「テスト品質チェック」「coverage 観点で見て」; reports findings only and never edits code.
+name: review-php-observability
+description: PHP / Laravel の差分を、観測性（ロギング・調査可能性）の観点でレビューするとき。ログコンテキストの付与・異常系/空結果のログ・例外ログの一元化・秘匿情報の非出力・ログレベルの整合を確認する。「ログ観点でレビュー」「観測性チェック」「調査可能性を見て」等で発動。コードは修正せず指摘のみ報告する。
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
-# /review-go-test
+# /review-php-observability
 
-Review Go backend changes against `<base>...HEAD` using two independent test-focused subagents. This is review-only: do not modify files.
+Review PHP / Laravel changes against `<base>...HEAD` using two independent observability-focused subagents. This is review-only: do not modify files.
 
 ## Input
 
-- `--base=<branch>`: optional. Default: `origin/master`.
+- `--base=<branch>`: optional. Default: `origin/master`, falling back to `origin/main`.
 
 ## Scope
 
 In scope:
-- where tests are required and how setup should be structured
-- repository tests, API integration tests, and tests for logic-bearing functions
-- assertion quality, false-negative prevention, boundary values, and layer-appropriate verification
+- ロギングと調査可能性（ログコンテキストの付与・異常系/空結果のログ・例外ログの一元化・ログレベルの整合）
+- 観測性の観点での秘匿情報の非出力
 
 Out of scope:
 - code edits
-- architecture and layer responsibility: use `review-go-architecture`
-- Go idioms, type safety, and naming: use `review-go-idioms`
-- DB schema, query performance, and external I/O: use `review-go-storage`
+- 秘匿値のマスク方針・認可・入力検証などのセキュリティ全般: `review-php-security` を使う
+- レイヤー責務・命名・DB・テスト: 各専用スキルを使う
 
 ## Workflow
 
@@ -31,12 +29,12 @@ Out of scope:
 
 ```bash
 git rev-parse --verify <base>
-git diff --name-only <base>...HEAD -- '*.go'
-git diff <base>...HEAD -- '*.go'
+git diff --name-only <base>...HEAD -- '*.php'
+git diff <base>...HEAD -- '*.php'
 ```
 
 2. Stop with `ブランチ <base> が見つかりません` if the base branch cannot be resolved.
-3. Stop with `レビュー対象の Go ファイルがありません` if no Go files changed.
+3. Stop with `レビュー対象の PHP ファイルがありません` if no PHP files changed.
 4. Store changed files as `<TARGET_FILES>` and the diff as `<DIFF_CONTEXT>`. If the diff exceeds about 60,000 characters, truncate the tail with `[... truncated ...]`.
 5. Read `references/focus-blocks.md`.
 6. Dispatch exactly two `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
@@ -47,7 +45,7 @@ git diff <base>...HEAD -- '*.go'
 Each subagent receives the shared context below plus one focus block from `references/focus-blocks.md`.
 
 ```text
-あなたは /review-go-test コマンドの1名のレビュー担当です。レビューのみ行い、ファイルは編集しないでください。
+あなたは /review-php-observability コマンドの1名のレビュー担当です。レビューのみ行い、ファイルは編集しないでください。
 
 対象ファイル:
 <TARGET_FILES>
@@ -58,7 +56,7 @@ Each subagent receives the shared context below plus one focus block from `refer
 <DIFF_CONTEXT>
 
 手順:
-1. 差分を読み、変更された Go ファイルを Read ツールで全文読み取る。
+1. 差分を読み、変更された PHP ファイルを Read ツールで全文読み取る。
 2. Read ツールの実ファイル行番号で指摘する。diff の @@ 行番号は使わない。
 3. 渡された focus の観点に厳密に絞る。他観点には触れない。
 
@@ -70,7 +68,7 @@ Each subagent receives the shared context below plus one focus block from `refer
 - **推奨する修正**: (どう修正すべきか)
 
 該当する指摘がない場合は「該当なし」とだけ明記してください。
-推測的な指摘は避け、根拠を示せる具体的な指摘のみ報告してください。
+推測的・スタイルだけの指摘は避け、根拠を示せる具体的な指摘のみ報告してください。
 ```
 
 ## Integration
@@ -83,4 +81,4 @@ After both subagents return:
 4. Print `合計N件 → 重複統合M件 → リストN-M件`; explain any mismatch.
 5. Output a numbered list and then include each finding detail from the subagent output.
 
-If both subagents return no findings, say `テスト戦略・テスト品質の観点では指摘はありません`.
+If both subagents return no findings, say `観測性の観点では指摘はありません`.

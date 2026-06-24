@@ -38,5 +38,6 @@ Review unused code, duplicate logs, unnecessary data fetches, and slice initiali
 - Avoid `log.Errorf` at call sites that also return the error when middleware already logs returned errors.
 - Check feature flags or conditions before fetching data that may not be needed.
 - When the final size is known, initialize slices with capacity: `make([]T, 0, len(items))`. Avoid unexplained capacity formulas such as `len(x)*2`.
+- Do not repeat loop-invariant conversions or computations inside loops (e.g. `string(enumValue)` that yields the same result every iteration); hoist them to a constant or precompute outside the loop.
 
 Report only concrete waste, noise, or future maintenance risk.

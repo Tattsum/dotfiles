@@ -7,9 +7,11 @@ Use one block per subagent. Keep each subagent constrained to its assigned block
 Review Controller / UseCase・Service / Eloquent Model の責務境界.
 
 - Controller が肥大化していないか。条件分岐・フィルタリング・計算といったビジネスロジックは UseCase / Service に切り出されているか。Controller は「入力受け取り → ユースケース呼び出し → レスポンス整形」に徹しているか。
-- Eloquent Model にビジネスロジックを詰め込みすぎていないか。複雑なユースケース組み立てが Model のメソッドに漏れていないか。
-- 入力検証が Controller 内に散らばっていないか。バリデーションは FormRequest に集約されているか。
+- Eloquent Model にビジネスロジックを詰め込みすぎていないか。複雑なユースケース組み立てが Model のメソッドに漏れていないか。レスポンス整形は API Resource、入力検証は FormRequest に分離されているか。
+- レスポンス都合の型変換（UNIX タイムスタンプ化・日付フォーマット等）を Model で行わず、境界（API Resource）で変換しているか。
+- 入力検証が Controller 内に散らばっていないか。バリデーションは FormRequest に集約されているか（`is_string` 等の型チェックを Controller で書いている時点で FormRequest 化を検討）。
 - ドメイン知識が本来所属するクラス/モジュールに置かれているか（別ドメインの分岐・フィルタを呼び出し側に書いていないか）。
+- Eloquent Model の `boot()` の `creating` イベントでフィールドバリデーションをしていないか（`create()` 時のみ発火し `insert()` では走らない不完全なガードになり、隠れた副作用で認知負荷が高い）。有効値は public 定数で定義し呼び出し元が明示的に使う。PHP 8.1+ なら Enum を cast に指定する。
 
 Report only responsibility leaks that are visible in the changed code.
 

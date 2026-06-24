@@ -1,12 +1,12 @@
 ---
-name: review-go-test
-description: Reviews Go backend diffs for test strategy, repository tests, integration tests, logic coverage, assertion quality, false negatives, boundary cases, and layer-appropriate verification. Use when the user asks for test review, test-quality review, coverage review, integration-test review, repository-test review, assertion review, or says 「テストをレビュー」「テスト品質チェック」「coverage 観点で見て」; reports findings only and never edits code.
+name: review-go-observability
+description: Reviews Go backend diffs for observability (logging and investigability)—structured log context, logging of failures/empty results, error wrapping vs. duplicated logging, secret exposure in logs, and log-level consistency. Use when the user asks for logging review, observability review, investigability review, or says 「ログ観点でレビュー」「観測性チェック」「調査可能性を見て」; reports findings only and never edits code.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
-# /review-go-test
+# /review-go-observability
 
-Review Go backend changes against `<base>...HEAD` using two independent test-focused subagents. This is review-only: do not modify files.
+Review Go backend changes against `<base>...HEAD` using two independent observability-focused subagents. This is review-only: do not modify files.
 
 ## Input
 
@@ -15,9 +15,10 @@ Review Go backend changes against `<base>...HEAD` using two independent test-foc
 ## Scope
 
 In scope:
-- where tests are required and how setup should be structured
-- repository tests, API integration tests, and tests for logic-bearing functions
-- assertion quality, false-negative prevention, boundary values, and layer-appropriate verification
+- structured log context for investigability (target entity id, tenant id, operation name)
+- logging of failures, unreached branches, and empty results
+- error wrapping with context vs. duplicated logging responsibility
+- secret exposure in logs and error messages, and log-level consistency
 
 Out of scope:
 - code edits
@@ -47,7 +48,7 @@ git diff <base>...HEAD -- '*.go'
 Each subagent receives the shared context below plus one focus block from `references/focus-blocks.md`.
 
 ```text
-あなたは /review-go-test コマンドの1名のレビュー担当です。レビューのみ行い、ファイルは編集しないでください。
+あなたは /review-go-observability コマンドの1名のレビュー担当です。レビューのみ行い、ファイルは編集しないでください。
 
 対象ファイル:
 <TARGET_FILES>
@@ -83,4 +84,4 @@ After both subagents return:
 4. Print `合計N件 → 重複統合M件 → リストN-M件`; explain any mismatch.
 5. Output a numbered list and then include each finding detail from the subagent output.
 
-If both subagents return no findings, say `テスト戦略・テスト品質の観点では指摘はありません`.
+If both subagents return no findings, say `観測性の観点では指摘はありません`.

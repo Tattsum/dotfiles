@@ -87,6 +87,11 @@ gh pr create --base "$BASE" --title "$TITLE" --body-file "$BODY_FILE" --reviewer
 
 作成後は PR の URL を報告する。
 
+## PR サイズ
+
+- PR が大きくなりすぎないよう分割を促す。差分は目安として 500 行以内、最大でも 1000 行程度に収める。
+- 関心が異なる変更（例: モデル追加とコントローラ追加）は別 PR に分けることを検討する（レビュー負荷を下げ、レビュー品質を保つため）。
+
 ## 方針
 
 - lint / test / review は走らせない（`dotfiles-lint-and-test` ・ review 系スキルの責務）
