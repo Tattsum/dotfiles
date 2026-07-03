@@ -27,6 +27,7 @@ Review クエリ性能・堅牢性.
 - WHERE / JOIN のカラムにインデックスがあるか。複合インデックスはカーディナリティの高いカラムを先頭にしているか。
 - 重い処理を同期リクエストに押し込んでいないか（Queue / Job 化の検討）。
 - 外部 API / DB の retry は固定間隔でなく exponential backoff か。キャッシュ TTL が必要以上に長くないか。
+- 同一キー（同一エンティティ）に対して同時実行され得る更新は、デッドロックを想定してリトライ（指数バックオフ）を入れているか。
 - 常に取得する必要がないデータを、フラグ・条件を確認する前に全件取得していないか（取得後フィルタで無駄な DB / API アクセスを発生させていないか）。
 
 Report only concrete performance or robustness risks, not speculative tuning.

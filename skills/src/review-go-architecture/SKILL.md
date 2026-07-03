@@ -1,12 +1,12 @@
 ---
 name: review-go-architecture
-description: Reviews Yappli Go backend diffs for architecture, layer boundaries, domain ownership, anti-corruption boundaries, semantic service calls, and design quality. Use when the user asks for Go architecture review, layer responsibility review, domain placement review, SRP/YAGNI/design quality review, or says 「アーキテクチャをレビュー」「レイヤー責務を見て」「設計レビュー」; reports findings only and never edits code.
+description: Reviews Go backend diffs for architecture, layer boundaries, domain ownership, anti-corruption boundaries, semantic service calls, and design quality. Use when the user asks for Go architecture review, layer responsibility review, domain placement review, SRP/YAGNI/design quality review, or says 「アーキテクチャをレビュー」「レイヤー責務を見て」「設計レビュー」; reports findings only and never edits code.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
 # /review-go-architecture
 
-Review Yappli Go backend changes against `<base>...HEAD` using three independent architecture-focused subagents. This is review-only: do not modify files.
+Review Go backend changes against `<base>...HEAD` using three independent architecture-focused subagents. This is review-only: do not modify files.
 
 ## Input
 

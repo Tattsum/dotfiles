@@ -1,12 +1,12 @@
 ---
 name: review-go-storage
-description: Reviews Yappli Go backend diffs for DB schema design, SQL query performance, indexes, N+1 risks, empty IN guards, timing inconsistencies, retry behavior, caching, and URL handling. Use when the user asks for DB design review, migration review, SQL performance review, persistence review, external API robustness review, or says 「DBレビュー」「マイグレーション確認」「クエリ性能チェック」; reports findings only and never edits code.
+description: Reviews Go backend diffs for DB schema design, SQL query performance, indexes, N+1 risks, empty IN guards, timing inconsistencies, retry behavior, caching, and URL handling. Use when the user asks for DB design review, migration review, SQL performance review, persistence review, external API robustness review, or says 「DBレビュー」「マイグレーション確認」「クエリ性能チェック」; reports findings only and never edits code.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
 # /review-go-storage
 
-Review Yappli Go backend changes against `<base>...HEAD` using two independent storage-focused subagents. This is review-only: do not modify files.
+Review Go backend changes against `<base>...HEAD` using two independent storage-focused subagents. This is review-only: do not modify files.
 
 ## Input
 

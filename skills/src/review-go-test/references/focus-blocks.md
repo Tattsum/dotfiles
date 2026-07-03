@@ -25,5 +25,6 @@ Review assertion quality, false-negative risk, boundary coverage, and layer-appr
 - Integration assertions should cover fields relevant to the method contract without asserting unrelated response details.
 - API response format, filtering, sorting, and pagination rules should be visible in tests.
 - Include boundary cases for pagination, date ranges, string length, empty lists, and upper limits where those boundaries matter.
+- In tests using mocks, verify not only return values but also which methods were called (e.g. `AssertCalled`) so the test confirms the expected interaction actually happened.
 
 Do not review whether a test file should exist in this block; that belongs to Focus A.

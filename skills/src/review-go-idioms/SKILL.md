@@ -1,12 +1,12 @@
 ---
 name: review-go-idioms
-description: Reviews Yappli Go backend diffs for Go idioms, type safety, optional/nil handling, sentinel errors, naming, function responsibility, package scope, and code hygiene. Use when the user asks for Go idiom review, type-safety review, naming review, function-design review, unused-code review, or says 「Goのイディオムをレビュー」「型安全性チェック」「命名規約を見て」; reports findings only and never edits code.
+description: Reviews Go backend diffs for Go idioms, type safety, optional/nil handling, sentinel errors, naming, function responsibility, package scope, and code hygiene. Use when the user asks for Go idiom review, type-safety review, naming review, function-design review, unused-code review, or says 「Goのイディオムをレビュー」「型安全性チェック」「命名規約を見て」; reports findings only and never edits code.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
 # /review-go-idioms
 
-Review Yappli Go backend changes against `<base>...HEAD` using three independent Go-language-focused subagents. This is review-only: do not modify files.
+Review Go backend changes against `<base>...HEAD` using three independent Go-language-focused subagents. This is review-only: do not modify files.
 
 ## Input
 

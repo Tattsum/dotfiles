@@ -32,6 +32,7 @@ Review SQL performance, data consistency, retries, cache, and URL handling.
 - Escape external values inserted into URL query parameters with `url.QueryEscape` or structured query APIs.
 - Ensure new `WHERE` and `JOIN` patterns are covered by appropriate indexes. Check composite index order against cardinality and filter usage.
 - Avoid N+1 DB queries or external API calls in loops; prefer batch fetches such as `ListByIDs`.
+- When the store can apply filter conditions, push filtering into the query instead of fetching all rows and filtering in application code (e.g. use DynamoDB `FilterExpression` to narrow on the store side and avoid wasting read capacity).
 - Protect multi-source reads from timing inconsistencies with transactions or explicit existence checks when needed.
 - Guard empty slices before constructing SQL `IN` clauses.
 
