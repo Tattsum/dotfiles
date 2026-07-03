@@ -1,6 +1,6 @@
 ---
 name: dotfiles-commit-push
-description: git のコミット・push を行うとき。秘密情報（鍵・トークン・認証情報・個人情報）の混入チェックと、Emoji + Title + Reason + Specification のコミットメッセージ規約を強制する。
+description: git のコミット・push を行うとき。秘密情報（鍵・トークン・認証情報・個人情報）の混入チェックと、Emoji + Title + Reason + Specification のコミットメッセージ規約を強制する。保護ブランチ（main/master/production/develop・デフォルトブランチ）上ではコミットせず、prefix 付きの開発ブランチを切ってから作業する。
 ---
 
 ## 目的
@@ -9,9 +9,46 @@ description: git のコミット・push を行うとき。秘密情報（鍵・�
 
 ## チェック
 
+- **コミット前に必ず「保護ブランチ上での分岐」を先に判定する**（下記セクション）
 - `git status` / `git diff` で意図した変更のみか確認
 - 機密情報（鍵・トークン・認証情報・個人情報）が含まれていないか確認
 - コミットメッセージは必ず規約フォーマットに従う（「なぜ」を中心に）
+
+## 保護ブランチ上での分岐（必須）
+
+このリポジトリでは「開発ブランチを切り、main/master/develop 等へ PR を出す」開発スタイルを取る。**コミットする前に、現在ブランチが保護ブランチかどうかを必ず判定する。**
+
+### 判定（保護ブランチ = 次の和集合）
+
+以下のいずれかに現在ブランチ名が一致したら保護ブランチとみなす。
+
+- 固定リスト: `main` / `master` / `production` / `develop`
+- リポジトリのデフォルトブランチ（動的検出）
+
+```bash
+current=$(git rev-parse --abbrev-ref HEAD)
+default=$(gh repo view --json defaultBranchRef -q .defaultBranchRef.name 2>/dev/null \
+  || git symbolic-ref --short refs/remotes/origin/HEAD 2>/dev/null | sed 's#^origin/##')
+```
+
+`current` が固定リストまたは `default` に一致 → 保護ブランチ。**一致しなければ**（既に開発ブランチにいる）このセクションは skip し、通常のコミットへ進む。
+
+### 保護ブランチだった場合の手順
+
+1. **無言で分岐しない。** 「保護ブランチ（`<current>`）上なので新しい開発ブランチを切る」と宣言する。
+2. 差分とコミット種別 Emoji から **prefix と説明を自動推論し、推奨ブランチ名を 1 つ提示**する。
+   - prefix 対応（基本セット）: 機能追加 = `feat/`（✨）／バグ修正 = `fix/`（🐛 等）／緊急の本番修正 = `hotfix/`／雑務・設定・ドキュメント = `chore/`（🔧・📝・♻️ 等）。判断に迷う場合のみユーザーに確認する。
+   - 説明部分: **英語・kebab-case・2〜4 語（〜30 文字目安）** で作業内容を端的に表す。例: `feat/protect-base-branch-commit`。
+3. **ユーザーの承認（または名前の上書き）を 1 往復で得る。** 承認されたら以降は commit / push まで自走してよい。
+4. 承認後に分岐する。
+
+```bash
+git switch -c <prefix>/<kebab-case-description>
+```
+
+5. 以降は通常どおり、秘密情報チェック → 4 要素コミット規約に合流する。
+
+> ブランチ作成はこのスキルの責務（`dotfiles-pr-create` は push 済みブランチからの PR 作成専任で、ブランチ作成・commit・push は行わない）。
 
 ## コミットメッセージ規約（必須）
 
