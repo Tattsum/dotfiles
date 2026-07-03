@@ -94,6 +94,10 @@ fi
 export NVM_DIR="$HOME/.nvm"
 [[ -s "/opt/homebrew/opt/nvm/nvm.sh" ]] && source "/opt/homebrew/opt/nvm/nvm.sh"
 
+# mise（node/java 等のバージョン管理。.mise.toml のあるプロジェクトでは
+# nodebrew/nvm より優先させるため、それらの後で activate する）
+command -v mise >/dev/null 2>&1 && eval "$(mise activate zsh)"
+
 # Google Cloud SDK（Homebrew Cask 版の path/補完。formula 版は PATH に既に入っている）
 [[ -f '/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc' ]] \
   && source '/opt/homebrew/Caskroom/google-cloud-sdk/latest/google-cloud-sdk/path.zsh.inc'
