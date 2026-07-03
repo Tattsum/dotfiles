@@ -17,6 +17,7 @@
     "command": "~/.claude/subagent-statusline.sh"
   },
   "enabledPlugins": {
-    "gopls-lsp@claude-plugins-official": true
+    "gopls-lsp@claude-plugins-official": true,
+    "claude-code-setup@claude-plugins-official": true
   }
 }
