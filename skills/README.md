@@ -21,6 +21,7 @@ skills/
     ├── dotfiles-commit-push/SKILL.md           # 秘密情報チェック + コミット規約を強制して commit / push
     ├── dotfiles-pr-create/SKILL.md             # push 済みブランチから PR を作成（既定 draft, base 自動判定）
     ├── dotfiles-lint-and-test/SKILL.md         # リポジトリ標準の lint / format / test を特定して実行
+    ├── dotfiles-conflict-resolve/SKILL.md      # git コンフリクトを安全に解消（操作種別判定→退避線→解消→検証、add まで）
     ├── dotfiles-php-laravel-lint-test/SKILL.md # PHP/Laravel の lint / 静的解析 / test を実行
     ├── dotfiles-security-performance/SKILL.md  # セキュリティ + パフォーマンスを Must/Should/Nice で指摘
     ├── dotfiles-go-review/SKILL.md             # Go レビューのオーケストレーター（4観点=10サブエージェントを並列起動）
