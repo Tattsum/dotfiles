@@ -1,0 +1,25 @@
+# State Focus Blocks
+
+Use one block per subagent. Keep each subagent constrained to its assigned block.
+
+## Focus A: State Scope And Management
+
+Review where state lives and whether global state is used appropriately.
+
+- Keep state as local as the usage allows. Do not promote state to a global store (Redux/Zustand/Pinia/Vuex) when only one component subtree reads it; global state that only one place uses adds coupling and re-render surface for no benefit.
+- Do not duplicate server data into global state when a data-fetching layer (React Query / SWR / Nuxt `useAsyncData` etc.) already owns it; two sources of truth drift.
+- Derived values should be computed (memo/`computed`/selector) from source state, not stored as a second copy that must be kept in sync manually.
+- Do not mutate state directly where the framework expects immutable updates (React) or reactive APIs (Vue `ref`/`reactive`); direct mutation skips updates.
+
+Report only concrete risks: duplicated/out-of-sync state, over-broad global state, or updates the framework will miss.
+
+## Focus B: Effects And Async
+
+Review effect dependencies, cleanup, and async handling.
+
+- `useEffect` / `watch` dependency lists must include every reactive value the effect reads. Missing deps cause stale closures; unnecessary deps cause extra runs. Do not silence the linter with an eslint-disable instead of fixing deps.
+- Effects that subscribe, set timers, or start requests must clean up (return a cleanup / `onUnmounted` / `AbortController`) to avoid leaks and setState-after-unmount.
+- Guard against race conditions when an async result may resolve after inputs changed or the component unmounted (ignore stale responses via an abort flag or `AbortController`).
+- Async data flows should handle loading and error states, not only the success path; an unhandled rejection or missing error branch leaves the UI stuck.
+
+Report only concrete correctness risks: stale/missing deps, leaks, races, or unhandled async errors.
