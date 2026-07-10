@@ -2,6 +2,8 @@
 
 Use one block per subagent. Keep each subagent constrained to its assigned block.
 
+準拠先: [The Go Programming Language Specification](http://go.dev/ref/spec) と [Uber Go Style Guide](https://github.com/uber-go/guide)。言語仕様に反する実装、および Uber Go Style Guide に明確に反する実装は Must として指摘する。
+
 ## Focus A: Type Safety
 
 Review pointer/value usage, optional/nil representation, and errors.
