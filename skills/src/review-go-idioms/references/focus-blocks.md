@@ -27,6 +27,7 @@ Review naming, responsibility, receiver methods, and package-level API shape.
 - Keep variables in the narrowest practical scope.
 - Align new file names with their primary type where possible.
 - Package-scope names should read clearly as `package.Name`, not just within the local file.
+- Information-placement split (see CLAUDE.md 情報配置の四分割原則): code carries HOW via naming/structure, comments carry WHY-NOT. Flag comments that restate HOW/WHAT the code already shows through names; a comment should justify a rejected alternative, trade-off, or gotcha, not narrate the code.
 
 Report only naming or API shape issues that mislead readers or expand contracts unnecessarily.
 
