@@ -19,5 +19,6 @@
   "enabledPlugins": {
     "gopls-lsp@claude-plugins-official": true,
     "claude-code-setup@claude-plugins-official": true
-  }
+  },
+  "advisorModel": "fable"
 }
