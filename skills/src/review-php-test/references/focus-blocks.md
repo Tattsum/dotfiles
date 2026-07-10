@@ -13,6 +13,7 @@ Review テスト命名・構造.
 - arrange で型付きの共通 Factory / Helper を活用しているか。推論が弱い生成（`factory()->create()` 等）に `@var` で型を補っているか。
 - 戻り値型を持つ型付きヘルパー（create 系）直後の `/** @var X $var */` は冗長なので削除しているか。一方 `X::factory()->create(...)` 直前の `@var` は factory の型推論が弱いため維持しているか。
 - 単一テストクラスでしか使わないテスト専用ヘルパーを、広く共有される共通 Helper クラスに足していないか。そのテストクラス内の private メソッドとして実装し、共有 Helper の汚染を避けてカプセル化しているか（複数クラスで再利用する場合のみ共通 Helper に置く）。
+- 情報配置の四分割原則（CLAUDE.md 参照）: テストは What（仕様・振る舞い）を担う。契約はテスト名（`@testdox` 含む）とケース定義で表現し、テストが仕様書として読める状態にしているか。テスト名やケースで表すべき振る舞いをコメントで補っていないか。
 
 Report only concrete test-readability or correctness risks.
 

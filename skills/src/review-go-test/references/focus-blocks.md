@@ -11,6 +11,7 @@ Review which tests should exist and how expensive test setup is structured.
 - Repository implementations such as `Get`, `Create`, `Update`, and `Delete` should usually have tests that hit the real DB, not only mocks. Place tests beside the implementation file.
 - New API endpoints should have integration tests covering handler -> usecase -> repository behavior.
 - Logic-bearing functions, especially entity/valueobject methods and utilities with branching, calculation, or transformation, should have unit tests. Trivial getters/setters and pure mapping can be covered indirectly.
+- Information-placement split (see CLAUDE.md 情報配置の四分割原則): tests carry WHAT (the spec/behavior). Express the contract through descriptive test names and table-driven cases so the test reads as the specification; do not push behavior that a case name or case row should state into a comment.
 
 Do not review assertion granularity, zero values, boundary values, or false-negative details in this block; those belong to Focus B.
 
