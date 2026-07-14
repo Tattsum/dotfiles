@@ -116,32 +116,9 @@
 
 ### GitHub コメント規則（必須）
 
-GitHub でレビューコメントを付けるときは、**必ずコメント先頭に shields.io バッジ（画像）を付ける**。太字テキスト（`**must**` など）ではなく、下表の Markdown 画像記法をそのまま貼る。
+GitHub でレビューコメントを投稿するときは、**必ず `dotfiles-review-and-act` skill の「コメント投稿手順」に従う**（shields.io バッジ・全件インライン・`--paginate` 重複照合・一括投稿の欠落照合が正本）。太字テキスト（`**must**` など）でなくバッジ画像を使うこと。
 
-| ラベル | 意味 | バッジ Markdown |
-|--------|------|-----------------|
-| must | 必ず修正して欲しい | `![must](https://img.shields.io/badge/review-must-red.svg)` |
-| want | 修正して欲しい | `![want](https://img.shields.io/badge/review-want-orange.svg)` |
-| imo | 自分の意見では修正した方が良い（他の人もそうかも） | `![imo](https://img.shields.io/badge/review-imo-orange.svg)` |
-| imho | 自分の意見では修正した方が良い（他の人は違うかも） | `![imho](https://img.shields.io/badge/review-imho-yellow.svg)` |
-| nits | 些細だが直した方が良い | `![nits](https://img.shields.io/badge/review-nits-green.svg)` |
-| info | アドバイス・共有（このPRでの修正は求めない） | `![info](https://img.shields.io/badge/review-info-lightgrey.svg)` |
-| ask | 単純な質問 | `![ask](https://img.shields.io/badge/review-ask-blue.svg)` |
-| suggestion | 提案 | `![suggestion](https://img.shields.io/badge/review-suggestion-blue.svg)` |
-
-バッジ直後に半角スペースを空けて本文を続ける（例: `![must](https://img.shields.io/badge/review-must-red.svg) Controller に認可チェックが無い → policy を追加`）。
-
-運用:
-
-- **すべての指摘・提案・質問はコード行に紐づくインラインコメントで行う**（general comment に箇条書きで並べない）。例外は PR 要約など行に紐づけられない内容のみ
-- PR コメントの取得・確認は**必ず `--paginate`**（既定30件で自分の投稿を見落とし → 再投稿で重複を生む）。件数が少なく感じても全件再確認まで再投稿しない
-- `POST /pulls/{pr}/reviews`（一括投稿）は無効行を無言でドロップし得る。送信後は `--paginate` で登録件数・行マッピングを照合し、欠落時は個別 `POST /pulls/{pr}/comments`（1件ずつ）で再投稿する
-- 最終確認は `path:line` + ラベル + ユニーク id で重複が無いか照合。重複は後発（created_at が新しい方）を `DELETE /pulls/comments/{id}` で削除する
-
-```bash
-# ✅ 必須: 全件取得しユニーク id で数える
-gh api repos/{owner}/{repo}/pulls/{pr}/comments --paginate --jq '.[].id' | sort -u | wc -l
-```
+PR レビューは同スキルがエントリポイント: **所有者で分岐**し、自分の PR なら改修（commit/push は `dotfiles-commit-push` へ委譲）、他人の PR なら上記手順でインライン投稿する。所有者があいまいなら止めて確認する。
 
 ---
 
