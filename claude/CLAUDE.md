@@ -116,9 +116,20 @@
 
 ### GitHub コメント規則（必須）
 
-GitHub でレビューコメントを付けるときは、**必ず先頭にラベルを付ける**。
+GitHub でレビューコメントを付けるときは、**必ずコメント先頭に shields.io バッジ（画像）を付ける**。太字テキスト（`**must**` など）ではなく、下表の Markdown 画像記法をそのまま貼る。
 
-- **must**: 必ず修正して欲しい／ **want**: 修正して欲しい／ **imo**: 自分の意見では修正した方が良い（他の人もそうかも）／ **imho**: 自分の意見では修正した方が良い（他の人は違うかも）／ **nits**: 些細だが直した方が良い／ **info**: アドバイス・共有（このPRでの修正は求めない）／ **ask**: 単純な質問
+| ラベル | 意味 | バッジ Markdown |
+|--------|------|-----------------|
+| must | 必ず修正して欲しい | `![must](https://img.shields.io/badge/review-must-red.svg)` |
+| want | 修正して欲しい | `![want](https://img.shields.io/badge/review-want-orange.svg)` |
+| imo | 自分の意見では修正した方が良い（他の人もそうかも） | `![imo](https://img.shields.io/badge/review-imo-orange.svg)` |
+| imho | 自分の意見では修正した方が良い（他の人は違うかも） | `![imho](https://img.shields.io/badge/review-imho-yellow.svg)` |
+| nits | 些細だが直した方が良い | `![nits](https://img.shields.io/badge/review-nits-green.svg)` |
+| info | アドバイス・共有（このPRでの修正は求めない） | `![info](https://img.shields.io/badge/review-info-lightgrey.svg)` |
+| ask | 単純な質問 | `![ask](https://img.shields.io/badge/review-ask-blue.svg)` |
+| suggestion | 提案 | `![suggestion](https://img.shields.io/badge/review-suggestion-blue.svg)` |
+
+バッジ直後に半角スペースを空けて本文を続ける（例: `![must](https://img.shields.io/badge/review-must-red.svg) Controller に認可チェックが無い → policy を追加`）。
 
 運用:
 
