@@ -22,18 +22,29 @@ Review migrations and table design.
 
 Report only schema choices that create correctness, migration, or maintenance risk.
 
-## Focus B: Query Performance And External I/O Robustness
+## Focus B: Query Performance And Indexing
 
-Review SQL performance, data consistency, retries, cache, and URL handling.
+Review SQL read efficiency: indexes, N+1, filter pushdown, and cache.
 
-- External API and retryable DB calls should use exponential backoff, not fixed-interval retry. Prefer existing retry libraries when the project already uses them.
-- Cache TTL should be the minimum duration that delivers the intended benefit; avoid long TTLs that can hide stale data.
-- Parse URLs with the `net/url` package instead of string splitting when query strings, fragments, or multiple patterns are possible.
-- Escape external values inserted into URL query parameters with `url.QueryEscape` or structured query APIs.
 - Ensure new `WHERE` and `JOIN` patterns are covered by appropriate indexes. Check composite index order against cardinality and filter usage.
 - Avoid N+1 DB queries or external API calls in loops; prefer batch fetches such as `ListByIDs`.
 - When the store can apply filter conditions, push filtering into the query instead of fetching all rows and filtering in application code (e.g. use DynamoDB `FilterExpression` to narrow on the store side and avoid wasting read capacity).
-- Protect multi-source reads from timing inconsistencies with transactions or explicit existence checks when needed.
 - Guard empty slices before constructing SQL `IN` clauses.
+- Cache TTL should be the minimum duration that delivers the intended benefit; avoid long TTLs that can hide stale data.
 
-Report only concrete risks visible from changed Go or SQL code.
+Report only concrete read-path performance risks visible from changed Go or SQL code.
+
+## Focus C: Write Integrity, Concurrency, And External I/O Robustness
+
+Review how writes, concurrency, and external calls behave under failure and contention.
+
+- External API and retryable DB calls should use exponential backoff, not fixed-interval retry. Prefer existing retry libraries when the project already uses them.
+- Parse URLs with the `net/url` package instead of string splitting when query strings, fragments, or multiple patterns are possible.
+- Escape external values inserted into URL query parameters with `url.QueryEscape` or structured query APIs.
+- Protect multi-source reads from timing inconsistencies with transactions or explicit existence checks when needed.
+- Do not rely on implicit DB lock semantics (e.g. MySQL gap locks) for concurrency correctness. When only one process may proceed at a time, take an explicit lock — a dedicated lock table/row selected `FOR UPDATE` — so the mutual exclusion is visible and intentional.
+- Persist progress incrementally for long or multi-step work, and on error save the steps completed up to the failure point rather than losing partial progress; keep history/audit state detailed enough to reconstruct what ran.
+- Control processing order via explicit data (e.g. a `scheduled_at` column) rather than relying on queue FIFO ordering, and pass an idempotency key through enqueue paths so a redelivery does not double-execute.
+- Bulk writes should be atomic; splitting into chunks to dodge a transaction size limit (e.g. Firestore's commit-size cap) sacrifices atomicity — make that trade-off deliberate, not accidental.
+
+Report only concrete write-integrity, concurrency, or external-I/O risks visible from changed Go or SQL code.

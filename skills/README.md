@@ -53,6 +53,9 @@ skills/
     ├── review-php-security/                      # PHP: インジェクション / 認可 / 機微情報（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
+    ├── review-iac/                               # IaC: Terraform/jsonnet の module 境界・ライフサイクル / 命名規約（単体観点）
+    │   ├── SKILL.md
+    │   └── references/focus-blocks.md
     ├── review-skill-security/                    # 外部 Skill をインストール前にセキュリティ静的解析
     │   ├── SKILL.md
     │   └── references/focus-blocks.md

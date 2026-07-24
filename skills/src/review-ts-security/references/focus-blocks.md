@@ -13,14 +13,17 @@ Review HTML injection sinks and unsafe output.
 
 Report only sinks reachable from user-controlled or external input.
 
-## Focus B: Input Validation And Secret Handling
+## Focus B: Authorization, Input Validation, And Secret Handling
 
-Review validation, CSRF, and secrets exposed to the client.
+Review authorization, validation, CSRF, and secrets exposed to the client.
 
+- Every server route / API handler must enforce authorization server-side — authenticated *and* permitted for this specific resource — on read, update, and delete. Do not rely on the UI hiding an action. Guard against privilege lockout (removing the last admin, a user demoting themselves out of access).
+- Do not fetch or proxy a user-supplied URL from the server without validating it against a scheme/origin allowlist (SSRF); pass secrets in request headers, not in query strings where they leak into logs and history.
+- Reject inputs that collide with reserved routes or system prefixes (an id that shadows a URL path) and inputs that silently corrupt downstream operations (e.g. numeric-looking strings like `"1e+21"` that break sort/filter/aggregation).
 - Client-side validation is UX only. Anything that protects data integrity or authorization must also be validated server-side; do not treat a client check as the security boundary.
 - Do not embed real secrets (API keys, tokens with server privileges) in client code or public env vars; anything shipped to the browser is public. Only publishable/anon keys belong in the bundle.
 - Do not store sensitive data (access tokens, PII) in `localStorage`/`sessionStorage` where XSS can read it; prefer httpOnly cookies for auth tokens.
 - State-changing requests should carry CSRF protection appropriate to the auth scheme (token/SameSite cookies) when the app relies on cookie auth.
 - Validate and constrain redirect targets and postMessage origins reached from user input.
 
-Report only concrete exposure or missing-server-validation risks, not defense-in-depth wishlist items.
+Report only concrete exposure, missing-authorization, or missing-server-validation risks, not defense-in-depth wishlist items.
