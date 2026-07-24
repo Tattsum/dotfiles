@@ -1,12 +1,12 @@
 ---
 name: review-go-storage
-description: Reviews Go backend diffs for DB schema design, SQL query performance, indexes, N+1 risks, empty IN guards, timing inconsistencies, retry behavior, caching, and URL handling. Use when the user asks for DB design review, migration review, SQL performance review, persistence review, external API robustness review, or says 「DBレビュー」「マイグレーション確認」「クエリ性能チェック」; reports findings only and never edits code.
+description: Reviews Go backend diffs for DB schema design, SQL query performance (indexes, N+1, filter pushdown, empty IN guards, cache), and write-integrity/concurrency/external-I/O robustness (retry backoff, explicit locking over implicit gap locks, incremental persistence, queue ordering/idempotency, bulk atomicity, timing consistency, URL handling). Use when the user asks for DB design review, migration review, SQL performance review, persistence review, concurrency/locking review, external API robustness review, or says 「DBレビュー」「マイグレーション確認」「クエリ性能チェック」「排他制御を見て」; reports findings only and never edits code.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
 # /review-go-storage
 
-Review Go backend changes against `<base>...HEAD` using two independent storage-focused subagents. This is review-only: do not modify files.
+Review Go backend changes against `<base>...HEAD` using three independent storage-focused subagents (schema design, query performance & indexing, write-integrity/concurrency/external-I/O robustness). This is review-only: do not modify files.
 
 ## Input
 
@@ -16,8 +16,8 @@ Review Go backend changes against `<base>...HEAD` using two independent storage-
 
 In scope:
 - DB table and migration design
-- query performance, indexes, N+1, empty `IN` guards, and timing inconsistencies
-- external API retry, cache TTL, and URL parsing/escaping
+- query performance: indexes, N+1, filter pushdown, empty `IN` guards, cache TTL
+- write integrity, concurrency, and external I/O robustness: retry backoff, explicit locking vs. implicit gap locks, incremental persistence / save-on-error, queue ordering & idempotency, bulk atomicity, multi-source timing consistency, URL parsing/escaping
 
 Out of scope:
 - code edits
@@ -39,8 +39,8 @@ git diff <base>...HEAD -- '*.go' '*.sql'
 3. Stop with `レビュー対象の Go/SQL ファイルがありません` if no Go or SQL files changed.
 4. Store changed files as `<TARGET_FILES>` and the diff as `<DIFF_CONTEXT>`. If the diff exceeds about 60,000 characters, truncate the tail with `[... truncated ...]`.
 5. Read `references/focus-blocks.md`.
-6. Dispatch exactly two `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
-7. Wait for both subagents before integrating results.
+6. Dispatch exactly three `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
+7. Wait for all three subagents before integrating results.
 
 ## Subagent Prompt Shape
 
@@ -75,7 +75,7 @@ Each subagent receives the shared context below plus one focus block from `refer
 
 ## Integration
 
-After both subagents return:
+After all three subagents return:
 
 1. Count findings by focus group.
 2. Verify each finding references a file in `<TARGET_FILES>`; separate out-of-scope findings with a warning.
@@ -83,4 +83,4 @@ After both subagents return:
 4. Print `合計N件 → 重複統合M件 → リストN-M件`; explain any mismatch.
 5. Output a numbered list and then include each finding detail from the subagent output.
 
-If both subagents return no findings, say `DB スキーマ・クエリ性能・外部通信堅牢性の観点では指摘はありません`.
+If all three subagents return no findings, say `DB スキーマ・クエリ性能・書込/並行/外部I/O 堅牢性の観点では指摘はありません`.

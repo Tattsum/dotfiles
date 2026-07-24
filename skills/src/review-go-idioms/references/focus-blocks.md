@@ -13,6 +13,7 @@ Review pointer/value usage, optional/nil representation, and errors.
 - Do not model nil separately when zero value and nil have the same business meaning.
 - If a value cannot be nil, avoid nil checks that imply it can be. If it can be nil, make that explicit in the type.
 - Do not branch on error strings. Use sentinel errors or custom error types with `errors.Is` / `errors.As`.
+- Wrap domain primitives (IDs, names, codes) in value objects with a validating constructor (`NewEventName(...) (EventName, error)` returning a sentinel such as `ErrEventNameRequired`), applied consistently across the domain. A field left as raw `string` while sibling fields already use value-object constructors is an inconsistency to flag.
 
 Report only type choices that affect correctness, readability, or API contracts.
 
@@ -29,6 +30,7 @@ Review naming, responsibility, receiver methods, and package-level API shape.
 - Keep variables in the narrowest practical scope.
 - Align new file names with their primary type where possible.
 - Package-scope names should read clearly as `package.Name`, not just within the local file.
+- A function's arguments should reflect what the operation actually needs; do not reuse an unrelated neighboring type for convenience (e.g. passing a whole `node` where only the message content is required). A reference or path an operation resolves must not hinge on a caller-supplied argument in a way that makes its target unpredictable.
 - Information-placement split (see CLAUDE.md 情報配置の四分割原則): code carries HOW via naming/structure, comments carry WHY-NOT. Flag comments that restate HOW/WHAT the code already shows through names; a comment should justify a rejected alternative, trade-off, or gotcha, not narrate the code.
 
 Report only naming or API shape issues that mislead readers or expand contracts unnecessarily.

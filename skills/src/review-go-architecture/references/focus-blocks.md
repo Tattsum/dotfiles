@@ -19,6 +19,7 @@ Review domain ownership, anti-corruption boundaries, and semantic service calls.
 - Domain knowledge belongs to the package that owns the concept. Do not put another domain's switch, filtering, or field-name knowledge in the caller package.
 - External API concepts and response types should be mapped in infrastructure before usecase/entity code sees them.
 - Call the method that matches the intent. For example, existence checks should prefer direct get/find semantics over list-and-count/filter patterns when available.
+- An operation's side-effects and cleanup belong inside that operation, not scattered across callers. If disabling an account must also delete related records, encapsulate that in the disable operation rather than making every caller remember the follow-up. Consume/delete a work item after the operation succeeds, not before it runs.
 
 Report only issues where the current location or call choice makes future changes harder or misrepresents intent.
 
@@ -31,5 +32,8 @@ Review YAGNI, impossible branches, reuse, SRP, and shared filtering.
 - Prefer existing utilities, services, or domain helpers over duplicating similar behavior.
 - Split functions with multiple responsibilities into clearer units.
 - Shared filtering or conversion logic should be centralized when two user-visible results must stay consistent.
+- Model polymorphic domain variants as an interface (or sum type), expressing each variant's distinct data at the type level. Do not flatten differing variants into one struct whose optional fields are only meaningful for some kinds; which kind carries which data should be visible in the type, not enforced by convention.
+- Do not special-case a single variant in control flow (an `if kind == X` / `IsEvent` branch that diverges from how sibling variants are handled) unless the divergence is justified; handle variants uniformly through the shared abstraction.
+- Avoid an indirection layer that carries no value: if a platform/native endpoint (e.g. a provider's REST API) can be called directly, question the extra wrapper/hop rather than adding one (YAGNI).
 
 Report only concrete maintainability or correctness risks, not broad style preferences.

@@ -11,6 +11,9 @@ Review unnecessary re-renders and memoization.
 - List rendering must use stable, identity-based `key`s (not array index when the list reorders/inserts); unstable keys cause remounts and state loss.
 - Avoid deriving heavy values in the render path on every render; compute them from a memo/`computed` keyed on their inputs.
 - In Vue, avoid heavy work inside templates/computed that re-runs on unrelated reactive changes; scope reactivity narrowly.
+- Do not run a linear scan (`Array.prototype.find`/`filter`/`includes`) over a large array inside a loop or per-render; that is O(n²). Build a `Map`/object index once and look up by key in O(1).
+- Render a shared dialog/modal once per list (pass the target via state), not one instance per row/item; per-row mounting of the same dialog multiplies DOM and render cost.
+- Debounce inputs that trigger expensive or flickering work on every keystroke (map redraws, refetches, layout recompute) instead of reacting to each change synchronously.
 
 Report only re-render or recompute costs that are concrete given the changed code, not speculative micro-optimizations.
 
