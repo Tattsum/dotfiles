@@ -112,6 +112,7 @@ echo "------------------------------"
 echo "⚡ Zed の設定をリンクします..."
 echo "------------------------------"
 link_file "$DOTFILES_DIR/zed/settings.json" "$HOME/.config/zed/settings.json"
+link_file "$DOTFILES_DIR/zed/keymap.json" "$HOME/.config/zed/keymap.json"
 
 echo ""
 echo "------------------------------"
