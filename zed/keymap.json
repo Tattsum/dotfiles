@@ -1,0 +1,47 @@
+// Zed keymap
+//
+// settings.json の `base_keymap: "JetBrains"` が IntelliJ 相当のバインドを大半カバーするため、
+// ここでは base keymap に無い IntelliJ (macOS default keymap) のショートカットだけを補う。
+// 全バインドを手書きしないのは、Zed 側の base keymap 更新に追従できなくなるため。
+//
+// IntelliJ の ⌃R (Run) / ⌃D (Debug) は足していない。vim_mode: true では ⌃R が redo、
+// ⌃D が half-page-down にあたるため。Run は ⌃⇧R と ⌥⌃R (base keymap) に寄せる。
+[
+  {
+    "context": "Editor",
+    "bindings": {
+      // Quick Documentation。Zed の hover popover が診断内容も出すので ⌘F1 も同じ動作に寄せる
+      "f1": "editor::Hover",
+      "cmd-f1": "editor::Hover",
+      // Collapse All / Expand All。macOS の keymap は shift 付きの記号を "shift-" ではなく
+      // シフト後のグリフで書く（base keymap の "cmd--" / "cmd-+" と同じ表記）ため、
+      // ⌘⇧- は "cmd-_"、⌘⇧+ は "cmd-+" になる。
+      // "cmd-+" は base keymap の単一 UnfoldLines を潰すが、⌘⇧+ と ⌘+ は mac 配列では同一打鍵で
+      // 区別できないので全体展開に割り当てる（単一の展開／折り畳みは ⌘- と ⌘K ⌘L で足りる）。
+      "cmd-_": "editor::FoldAll",
+      "cmd-+": "editor::UnfoldAll",
+      // Last Edit Location。Zed に編集位置専用の履歴が無いため移動履歴 (⌘[ と同じ) で代用する
+      "cmd-shift-backspace": "pane::GoBack",
+      // Run context configuration。カーソル位置に対応する task を起動する
+      "ctrl-shift-r": "editor::SpawnNearestTask",
+      "cmd-shift-c": "editor::CopyPath",
+      // Copy Reference (path:line)
+      "cmd-alt-shift-c": "editor::CopyFileLocation"
+    }
+  },
+  {
+    // Run ツールウィンドウ。Zed では task の出力が terminal panel に出る
+    "context": "Workspace",
+    "bindings": {
+      "cmd-4": "terminal_panel::ToggleFocus"
+    }
+  },
+  {
+    // JetBrains base keymap が Pane コンテキストで cmd-4 を null にしているため、
+    // Workspace 側の指定だけではエディタにフォーカスがあるときに効かない
+    "context": "Pane",
+    "bindings": {
+      "cmd-4": "terminal_panel::ToggleFocus"
+    }
+  }
+]
