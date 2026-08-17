@@ -1,12 +1,12 @@
 ---
 name: review-iac
-description: Reviews Infrastructure-as-Code diffs (Terraform / OpenTofu `.tf`/`.tfvars`/`.hcl`, and jsonnet/libsonnet config such as ecspresso) for module boundaries and lifecycle separation (splitting resources with different create/update/destroy cadences, isolating out-of-band bootstrap steps) and naming/convention consistency (module, resource, environment, and subdomain naming aligned with existing conventions). Use when the user asks for Terraform review, IaC review, module-structure review, or says 「IaC をレビュー」「Terraform の差分を見て」「module 構成を見て」; reports findings only and never edits code.
+description: Reviews Infrastructure-as-Code diffs (Terraform / OpenTofu `.tf`/`.tfvars`/`.hcl`, and jsonnet/libsonnet config such as ecspresso) for module boundaries and lifecycle separation (splitting resources with different create/update/destroy cadences, isolating out-of-band bootstrap steps, count/for_each apply-time dependencies, explicit depends_on), naming/convention consistency (module, resource, environment, and subdomain naming, unused declarations, operational outputs), and security/operational signals (least-privilege IAM scoping, explicit security-relevant defaults, alarm-metric correctness). Use when the user asks for Terraform review, IaC review, module-structure review, IAM least-privilege review, or says 「IaC をレビュー」「Terraform の差分を見て」「module 構成を見て」「IAM 権限を見て」; reports findings only and never edits code.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
 # /review-iac
 
-Review Infrastructure-as-Code changes against `<base>...HEAD` using two independent focused subagents (module boundaries & lifecycle, naming & convention consistency). This is review-only: do not modify files.
+Review Infrastructure-as-Code changes against `<base>...HEAD` using three independent focused subagents (module boundaries & lifecycle, naming & convention consistency, security & operational signals). This is review-only: do not modify files.
 
 ## Input
 
@@ -18,6 +18,7 @@ In scope:
 - Terraform / OpenTofu (`.tf`, `.tfvars`, `.hcl`) and jsonnet/libsonnet deploy config (`.jsonnet`, `.libsonnet`, e.g. ecspresso)
 - module boundaries and lifecycle separation
 - naming and convention consistency for modules, resources, environments, and subdomains
+- security and operational signals: least-privilege IAM scoping, explicit security-relevant defaults, alarm-metric correctness
 
 Out of scope:
 - code edits
@@ -36,8 +37,8 @@ skill-resolve-diff --base <base> -- '*.tf' '*.tfvars' '*.hcl' '*.jsonnet' '*.lib
 3. Stop with `レビュー対象の IaC ファイルがありません` if no IaC files changed.
 4. Store `files` as `<TARGET_FILES>` and `diff` as `<DIFF_CONTEXT>`. When `truncated` is true, keep `truncated_files` as `<TRUNCATED_FILES>`, pass it to every subagent, and report the truncation and the dropped file list to the user. Never drop them silently: the cut point moves as commits land, so silent truncation changes review coverage between runs on the same PR.
 5. Read `references/focus-blocks.md`. Stop if it cannot be read: report the path and tell the user to run `./install.sh` to re-link the skills. Never review with a partially loaded focus set — "no findings for this focus" and "this focus never ran" are indistinguishable in the output, so a re-review of the same PR would silently drop last run's findings.
-6. Dispatch exactly two `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
-7. Wait for both subagents before integrating results.
+6. Dispatch exactly three `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
+7. Wait for all three subagents before integrating results.
 
 ## Subagent Prompt Shape
 
@@ -77,7 +78,7 @@ Each subagent receives the shared context below plus one focus block from `refer
 
 ## Integration
 
-After both subagents return:
+After all three subagents return:
 
 1. Count findings by focus group.
 2. Verify each finding references a file in `<TARGET_FILES>`; separate out-of-scope findings with a warning.
@@ -85,4 +86,4 @@ After both subagents return:
 4. Print `合計N件 → 重複統合M件 → リストN-M件`; explain any mismatch.
 5. Output a numbered list and then include each finding detail from the subagent output.
 
-If both subagents return no findings, say `IaC のモジュール境界・命名規約の観点では指摘はありません`.
+If all three subagents return no findings, say `IaC のモジュール境界・命名規約・セキュリティ/運用シグナルの観点では指摘はありません`.
