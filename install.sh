@@ -101,6 +101,7 @@ echo "------------------------------"
 # ~/.cursor/skills・TARGET/.cursor/skills の3系統に配られるため、skill 内に
 # 置くと参照側にパス解決のフォールバックが要る。コマンド名で呼べば1行で済む。
 link_file "$DOTFILES_DIR/bin/skill-resolve-diff" "$HOME/.local/bin/skill-resolve-diff"
+link_file "$DOTFILES_DIR/bin/skill-review-state" "$HOME/.local/bin/skill-review-state"
 
 echo ""
 echo "------------------------------"
