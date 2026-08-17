@@ -12,21 +12,19 @@ PHP / Laravel の `<base>...HEAD` 差分を、6観点を focus 単位に細分�
 
 ## Input
 
-- `--base=<branch>`: optional. Default: `origin/master`、解決できなければ `origin/main`。
+- `--base=<branch>`: optional。解決は `skill-resolve-diff` に委譲する（`origin/master`、無ければ `origin/main`）。
 
 ## Workflow
 
 1. レビュー範囲を解決する:
 
 ```bash
-git rev-parse --verify <base>
-git diff --name-only <base>...HEAD -- '*.php' '*.blade.php' 'database/migrations/*'
-git diff <base>...HEAD -- '*.php' '*.blade.php' 'database/migrations/*'
+skill-resolve-diff --base <base> -- '*.php' '*.blade.php' 'database/migrations/*'
 ```
 
 2. base ブランチが解決できなければ `ブランチ <base> が見つかりません` と伝えて終了。
 3. 変更ファイルがなければ `レビュー対象の変更がありません` と伝えて終了。
-4. 変更ファイルを `<TARGET_FILES>`、差分を `<DIFF_CONTEXT>` として保持する。差分が約 60,000 文字を超える場合は末尾を `[... truncated ...]` で切り詰める。
+4. `files` を `<TARGET_FILES>`、`diff` を `<DIFF_CONTEXT>` として保持する。`truncated` が true のときは `truncated_files` を `<TRUNCATED_FILES>` として保持し、全サブエージェントに渡したうえで、切り詰めが起きた事実と落ちたファイル一覧をユーザーに報告する。黙って落とさない: 切断位置は commit が増えるたびに動くため、同じ PR でも実行ごとにレビュー範囲が変わる。
 5. 6観点ぶんの focus-block 定義を読み込む。各観点スキルの `references/focus-blocks.md` を Read する:
 
 ```
@@ -38,9 +36,9 @@ git diff <base>...HEAD -- '*.php' '*.blade.php' 'database/migrations/*'
 ~/.claude/skills/review-php-observability/references/focus-blocks.md
 ```
 
-   上記パスが無ければ Glob で `**/review-php-*/references/focus-blocks.md` を探して読む。1つも見つからなければ、観点スキル未インストールである旨（`make -C skills install-global` を案内）を伝えて終了。
+   **6ファイルすべてが読めなければ停止する（fail closed）**。読めなかったファイル名を挙げ、`./install.sh` を実行して skill を再配置するよう伝えて終了する。一部だけで続行しない: 「その観点で指摘が0件だった」と「その観点をそもそも実行していない」が出力上区別できず、同じ PR を再レビューしたときに前回の指摘が理由なく消えるため。
 
-6. 読み込んだ全 focus block（6観点 × 各2 focus = 計12）について、`general-purpose` サブエージェントを**1つのアシスタントメッセージ内で一斉に並列起動**する。1サブエージェント＝1 focus block。逐次実行やインラインレビューで代替しない。Agent が使えない場合は、本スキルはユーザーセッションから直接起動する必要がある旨を伝えて終了。
+6. 各ファイル内の `## Focus ...` ブロックが1サブエージェント分の担当範囲。**読み込めた focus block を実際に数え、その数だけ** `general-purpose` サブエージェントを**1つのアシスタントメッセージ内で一斉に並列起動**する。1サブエージェント＝1 focus block。逐次実行やインラインレビューで代替しない。件数はここに書かず必ず数えること（ハードコードすると focus 追加時にドリフトする）。Agent が使えない場合は、本スキルはユーザーセッションから直接起動する必要がある旨を伝えて終了。
 7. 全サブエージェントの完了を待つ。
 8. 統合の前に、下記「横断チェック」を全体差分に対してオーケストレーター自身で実施し、所見を観点 `横断` として持つ。
 
@@ -59,6 +57,10 @@ git diff <base>...HEAD -- '*.php' '*.blade.php' 'database/migrations/*'
 差分:
 <DIFF_CONTEXT>
 
+差分本文から切り詰めで落ちたファイル（空なら「なし」）:
+<TRUNCATED_FILES>
+※ ここに挙がったファイルは差分本文に含まれていない。必ず Read で全文を読むこと。差分に無いことを見落としの理由にしない。
+
 担当する focus:
 <FOCUS_BLOCK>
 
@@ -70,7 +72,7 @@ git diff <base>...HEAD -- '*.php' '*.blade.php' 'database/migrations/*'
 
 出力フォーマット:
 ### [ファイルパス:行番号]
-- **観点**: (focus 内の観点タイトル)
+- **観点**: 担当した focus の見出し（`## Focus X: ...`）を逐語でそのまま書く。言い換え・要約・独自の観点名の創作はしない。
 - **問題点**: (具体的に何が問題か)
 - **Why**: (なぜ修正すべきか)
 - **推奨する修正**: (どう修正すべきか)
@@ -92,7 +94,7 @@ git diff <base>...HEAD -- '*.php' '*.blade.php' 'database/migrations/*'
 
 1. 観点（OWNER）ごとに指摘件数をカウントする。横断チェックの所見も観点 `横断` としてカウントに含める。
 2. 各指摘が `<TARGET_FILES>` 内のファイルを参照しているか検証し、対象外は警告付きで分離する。
-3. 統合は「同一ファイル・同一行・同一観点タイトル」の場合のみ行い、統合時は元の観点名を併記する。
+3. 統合は「同一ファイル・同一行・同一の focus 見出し（逐語一致）」の場合のみ行い、統合時は元の観点名を併記する。サブエージェントが見出しを言い換えていた場合は、言い換えのまま統合せず focus block の見出しに引き直す。
 4. `観点別カウント: architecture: N件, idioms: N件, storage: N件, test: N件, security: N件, observability: N件, 横断: N件 (合計N件) → 重複統合M件 → リストN-M件` を出力し、差分があれば原因を明記する。
 5. まず観点 × 重要度のサマリー表を出力する。各セルは件数。観点に指摘がなければ `0` を入れる。
 

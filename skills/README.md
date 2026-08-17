@@ -73,6 +73,9 @@ skills/
 ## コマンド
 
 - `make -C skills list`
-- `make -C skills install TARGET=<path-to-repo-root>`
-- `make -C skills install-global` — `~/.claude/skills/` に全スキルをコピー（Claude Code グローバル利用）
+- `make -C skills install TARGET=<path-to-repo-root>` — 他リポジトリの `.cursor/skills/` へコピー
+- `./install.sh` — `~/.claude/skills/` と `~/.cursor/skills/` へ symlink（グローバル利用の正本）
+
+グローバル配置は symlink なので、`src/` を編集した時点で反映される。`skill-*` スクリプトも
+`install.sh` が `~/.local/bin/` へリンクするため、SKILL.md からはコマンド名で呼べる。
 

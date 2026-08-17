@@ -10,7 +10,7 @@ Review PHP / Laravel changes against `<base>...HEAD` using two independent secur
 
 ## Input
 
-- `--base=<branch>`: optional. Default: `origin/master`, falling back to `origin/main`.
+- `--base=<branch>`: optional. Resolution is delegated to `skill-resolve-diff` (`origin/master`, falling back to `origin/main`).
 
 ## Scope
 
@@ -27,15 +27,13 @@ Out of scope:
 1. Resolve the review scope:
 
 ```bash
-git rev-parse --verify <base>
-git diff --name-only <base>...HEAD -- '*.php' '*.blade.php'
-git diff <base>...HEAD -- '*.php' '*.blade.php'
+skill-resolve-diff --base <base> -- '*.php' '*.blade.php'
 ```
 
 2. Stop with `ブランチ <base> が見つかりません` if the base branch cannot be resolved.
 3. Stop with `レビュー対象のファイルがありません` if no PHP / Blade files changed.
-4. Store changed files as `<TARGET_FILES>` and the diff as `<DIFF_CONTEXT>`. If the diff exceeds about 60,000 characters, truncate the tail with `[... truncated ...]`.
-5. Read `references/focus-blocks.md`.
+4. Store `files` as `<TARGET_FILES>` and `diff` as `<DIFF_CONTEXT>`. When `truncated` is true, keep `truncated_files` as `<TRUNCATED_FILES>`, pass it to every subagent, and report the truncation and the dropped file list to the user. Never drop them silently: the cut point moves as commits land, so silent truncation changes review coverage between runs on the same PR.
+5. Read `references/focus-blocks.md`. Stop if it cannot be read: report the path and tell the user to run `./install.sh` to re-link the skills. Never review with a partially loaded focus set — "no findings for this focus" and "this focus never ran" are indistinguishable in the output, so a re-review of the same PR would silently drop last run's findings.
 6. Dispatch exactly two `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
 7. Wait for both subagents before integrating results.
 
@@ -54,6 +52,10 @@ Each subagent receives the shared context below plus one focus block from `refer
 差分:
 <DIFF_CONTEXT>
 
+差分本文から切り詰めで落ちたファイル（空なら「なし」）:
+<TRUNCATED_FILES>
+※ ここに挙がったファイルは差分本文に含まれていない。必ず Read で全文を読むこと。差分に無いことを見落としの理由にしない。
+
 手順:
 1. 差分を読み、変更されたファイルを Read ツールで全文読み取る。
 2. Read ツールの実ファイル行番号で指摘する。diff の @@ 行番号は使わない。
@@ -61,7 +63,7 @@ Each subagent receives the shared context below plus one focus block from `refer
 
 出力フォーマット:
 ### [ファイルパス:行番号]
-- **観点**: (focus 内の観点タイトル)
+- **観点**: 担当した focus の見出し（`## Focus X: ...`）を逐語でそのまま書く。言い換え・要約・独自の観点名の創作はしない。
 - **問題点**: (具体的に何が問題か)
 - **Why**: (なぜ修正すべきか / どんな攻撃・漏洩につながるか)
 - **推奨する修正**: (どう修正すべきか)
@@ -76,7 +78,7 @@ After both subagents return:
 
 1. Count findings by focus group.
 2. Verify each finding references a file in `<TARGET_FILES>`; separate out-of-scope findings with a warning.
-3. Merge only findings with the same file, same line, and same focus title.
+3. Merge only findings with the same file, same line, and the same verbatim focus heading. If a subagent paraphrased its heading, re-derive it from the focus block instead of merging on the paraphrase.
 4. Print `合計N件 → 重複統合M件 → リストN-M件`; explain any mismatch.
 5. Output a numbered list and then include each finding detail from the subagent output.
 

@@ -91,15 +91,15 @@ token/鍵/環境変数/内部パスを出力に含めない。
 
 ### 4. レビュー実行（言語別 review-* へ委譲）
 
-差分の変更ファイル拡張子から言語を判定し、対応するオーケストレーターを起動する。複数言語が混在する場合は該当する複数を起動する。
+差分の変更ファイル拡張子から言語を判定し、対応するオーケストレーターを起動する。複数言語が混在する場合は該当する複数を起動する。判定は `skill-resolve-diff` の `languages` をそのまま使い、拡張子の対応表をここで再実装しない。
 
 ```bash
-git diff --name-only <base>...HEAD
+skill-resolve-diff --base <base>
 ```
 
-- `*.go` / `*.sql` / `*.proto` → `dotfiles-go-review`
-- `*.php` → `dotfiles-php-laravel-review`
-- `*.ts` / `*.tsx` / `*.vue` / `*.js` / `*.jsx` → `dotfiles-ts-review`
+- `languages` に `go`（`*.go` / `*.sql` / `*.proto`）→ `dotfiles-go-review`
+- `languages` に `php`（`*.php`）→ `dotfiles-php-laravel-review`
+- `languages` に `ts`（`*.ts` / `*.tsx` / `*.vue` / `*.js` / `*.jsx`）→ `dotfiles-ts-review`
 
 いずれの言語にも当たらない場合は、CLAUDE.md「基本観点」（レイヤー境界 / エラー処理 / 命名・可読性 / テスト / セキュリティ / パフォーマンス）でインラインレビューする。委譲先の出力（Must / Should / Nice の重要度別指摘リスト）を `<FINDINGS>` として保持する。
 
