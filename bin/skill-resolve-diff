@@ -79,13 +79,19 @@ diff_out="$diff_all"
 if [ "${#diff_all}" -gt "$max_chars" ]; then
   truncated=true
   diff_out="${diff_all:0:$max_chars}"
-  # 切断点が属するファイル（本文中で最後に現れる +++ b/）は、ヘッダだけ届いて
+  # 届いたファイルは `+++ b/` と `--- a/` の和で拾う。削除ファイルの `+++` は
+  # `/dev/null` になるため、b 側だけ見ると完全に届いていても「落ちた」と誤報する。
+  # 追加ファイルは逆に a 側が `/dev/null` になるので、両側の和を取る必要がある。
+  kept="$(printf '%s\n' "$diff_out" | rg -o '^(?:\+\+\+ b/|--- a/)(.*)$' -r '$1' || true)"
+  kept="$(printf '%s\n' "$kept" | rg -v '^$' || true)"
+  # 切断点が属するファイル（本文中で最後に現れるヘッダ）は、ヘッダだけ届いて
   # ハンクの大半が落ちている可能性がある。ヘッダの有無で「届いた」と判定すると
   # 部分配送を完全配送と誤認するため、境界ファイルは落ちた扱いにする（安全側）。
   # 過剰に落ちた扱いにしても呼び出し側が Read で読むだけで害はない。
-  kept="$(printf '%s\n' "$diff_out" | rg -o '^\+\+\+ b/(.*)$' -r '$1' || true)"
-  boundary="$(printf '%s\n' "$kept" | rg -v '^$' | tail -1)"
-  kept="$(printf '%s\n' "$kept" | rg -v '^$' | rg -vFx "$boundary" || true)"
+  boundary="$(printf '%s\n' "$kept" | tail -1)"
+  if [ -n "$boundary" ]; then
+    kept="$(printf '%s\n' "$kept" | rg -vFx "$boundary" || true)"
+  fi
   truncated_files="$(comm -23 \
     <(printf '%s\n' "$files" | rg -v '^$' | sort -u) \
     <(printf '%s\n' "$kept"  | rg -v '^$' | sort -u))"
