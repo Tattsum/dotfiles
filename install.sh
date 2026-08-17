@@ -36,6 +36,9 @@ mkdir -p "$HOME/.claude/skills" "$HOME/.cursor/skills"
 for skill_dir in "$DOTFILES_DIR"/skills/src/*/; do
   [ -d "$skill_dir" ] || continue
   skill_name="$(basename "$skill_dir")"
+  # skill_name が空だと直下の rm -rf が skills ディレクトリごと消す。glob の性質上
+  # 現状は空にならないが、$HOME 配下の再帰削除に暗黙の前提を残さない。
+  [ -n "$skill_name" ] || continue
   # 配置前に rm -rf する。ln -sfn は宛先が実ディレクトリの場合エラーにならず、
   # ディレクトリの「中」に symlink を作って入れ子（dest/name/name）を生やすため、
   # -n だけでは過去の cp 配置や前回の入れ子が残り続ける。
