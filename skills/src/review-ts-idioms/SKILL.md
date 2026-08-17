@@ -1,12 +1,12 @@
 ---
 name: review-ts-idioms
-description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for type safety (any avoidance, unknown/generics, runtime validation of API responses, casts hiding future type changes, optional-prop and fallback misuse), type organization/idioms (shared type definitions, discriminated unions, non-null assertion abuse, IDs-as-keys, i18n key parity), and styling/markup discipline (design tokens over arbitrary values, spacing ownership, design-system components, accessible semantic markup). Use when the user asks for TypeScript type-safety review, frontend idiom review, styling/a11y review, or says 「TS の型安全性を見て」「any をチェック」「型定義をレビュー」「デザインシステム/styling を見て」; reports findings only and never edits code.
+description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for type safety (any avoidance, unknown/generics, runtime validation of API responses, casts hiding future type changes, optional-prop and fallback misuse), type organization/idioms (shared type definitions, discriminated unions, non-null assertion abuse, IDs-as-keys, i18n key parity and hardcoded-string externalization), styling/markup discipline (design tokens over arbitrary values, spacing ownership, design-system components, accessible semantic markup), and code hygiene (magic-number constants, config/secret aggregation, comment discipline, transitive-dependency honesty, dropped-input handling). Use when the user asks for TypeScript type-safety review, frontend idiom review, styling/a11y review, code-hygiene review, or says 「TS の型安全性を見て」「any をチェック」「型定義をレビュー」「デザインシステム/styling を見て」「マジックナンバーや定数化を見て」; reports findings only and never edits code.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
 # /review-ts-idioms
 
-Review TypeScript / Vue / React frontend changes against `<base>...HEAD` using three independent focused subagents (type safety, type organization/idioms, styling & markup discipline). This is review-only: do not modify files.
+Review TypeScript / Vue / React frontend changes against `<base>...HEAD` using four independent focused subagents (type safety, type organization/idioms, styling & markup discipline, code hygiene). This is review-only: do not modify files.
 
 ## Input
 
@@ -16,8 +16,9 @@ Review TypeScript / Vue / React frontend changes against `<base>...HEAD` using t
 
 In scope:
 - `any` avoidance, `unknown`/generics, and runtime validation of external data (API responses); casts that hide future type changes; optional-prop and fallback (`?? ""`) misuse
-- shared type organization, discriminated unions, and TypeScript idioms; IDs-as-keys; i18n key/punctuation parity
+- shared type organization, discriminated unions, and TypeScript idioms; IDs-as-keys; i18n key/punctuation parity and externalizing hardcoded user-visible strings
 - styling & markup discipline: design tokens over arbitrary values, components owning no external margin, design-system components over raw markup, accessible semantic HTML
+- code hygiene: magic-number/repeated-literal constants, config & secret aggregation, comments carrying Why-not (not What/How), direct imports declared as dependencies, not silently dropping unexpected input
 
 Out of scope:
 - code edits
@@ -39,8 +40,8 @@ skill-resolve-diff --base <base> -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.vue'
 3. Stop with `レビュー対象のフロントエンドファイルがありません` if no frontend files changed.
 4. Store `files` as `<TARGET_FILES>` and `diff` as `<DIFF_CONTEXT>`. When `truncated` is true, keep `truncated_files` as `<TRUNCATED_FILES>`, pass it to every subagent, and report the truncation and the dropped file list to the user. Never drop them silently: the cut point moves as commits land, so silent truncation changes review coverage between runs on the same PR.
 5. Read `references/focus-blocks.md`. Stop if it cannot be read: report the path and tell the user to run `./install.sh` to re-link the skills. Never review with a partially loaded focus set — "no findings for this focus" and "this focus never ran" are indistinguishable in the output, so a re-review of the same PR would silently drop last run's findings.
-6. Dispatch exactly three `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
-7. Wait for all three subagents before integrating results.
+6. Dispatch exactly four `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
+7. Wait for all four subagents before integrating results.
 
 ## Subagent Prompt Shape
 
@@ -80,7 +81,7 @@ Each subagent receives the shared context below plus one focus block from `refer
 
 ## Integration
 
-After all three subagents return:
+After all four subagents return:
 
 1. Count findings by focus group.
 2. Verify each finding references a file in `<TARGET_FILES>`; separate out-of-scope findings with a warning.
@@ -88,4 +89,4 @@ After all three subagents return:
 4. Print `合計N件 → 重複統合M件 → リストN-M件`; explain any mismatch.
 5. Output a numbered list and then include each finding detail from the subagent output.
 
-If all three subagents return no findings, say `型安全性・型定義・styling の観点では指摘はありません`.
+If all four subagents return no findings, say `型安全性・型定義・styling・コード衛生の観点では指摘はありません`.

@@ -26,5 +26,6 @@ Review main-thread cost, code splitting, and payload size.
 - Avoid importing a whole library for one helper when a tree-shakeable/subpath import exists; watch for large dependencies added for small needs.
 - Long lists should be virtualized/paginated instead of rendering thousands of DOM nodes at once.
 - Images/assets should use appropriate loading (lazy, sized, modern formats) when introduced in the diff.
+- Watch the cost of metered/billed external calls (paid APIs, quota-limited services). Flag calls made more often than needed — a per-keystroke autocomplete that abandons its session token so each selection is billed as a new session, a validation that re-fetches config on every call with no cache, or the removal of an input cap (`maxTexts` / `maxTotalCharacters`) that guarded against runaway paid usage. Cost and quota are a load dimension, not only latency.
 
 Report only concrete load/compute costs visible in the changed code.

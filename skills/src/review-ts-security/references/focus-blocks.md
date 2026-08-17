@@ -10,6 +10,7 @@ Review HTML injection sinks and unsafe output.
 - Do not build DOM/HTML by string concatenation with untrusted input (`innerHTML`, `insertAdjacentHTML`, `document.write`). Prefer text nodes / framework binding.
 - Reject `javascript:` and `data:` URLs where a user value flows into `href`/`src`/`window.open`; validate the scheme against an allowlist (`http`/`https`/relative).
 - Be cautious with dynamic script/style injection and third-party embeds fed by user input.
+- For an embedded `<iframe>`, do not default the `sandbox` attribute to a permissive value — in particular do not include `allow-same-origin` (combined with `allow-scripts` it lets the framed content escape the sandbox). Start from the most restrictive `sandbox` and add only the tokens required, allowlisting specific embed hosts rather than granting broadly. A value the docs explicitly warn against must not be the default.
 
 Report only sinks reachable from user-controlled or external input.
 
