@@ -31,6 +31,7 @@ Review SQL read efficiency: indexes, N+1, filter pushdown, and cache.
 - When the store can apply filter conditions, push filtering into the query instead of fetching all rows and filtering in application code (e.g. use DynamoDB `FilterExpression` to narrow on the store side and avoid wasting read capacity).
 - Guard empty slices before constructing SQL `IN` clauses.
 - Cache TTL should be the minimum duration that delivers the intended benefit; avoid long TTLs that can hide stale data.
+- Watch the cost of metered/billed external calls (paid APIs, quota-limited services), not just latency. Flag calls repeated more than necessary — a config re-fetched on every request with no cache, a per-item paid lookup that could be batched, or a removed guard that had capped billed usage. Quota and billing are a read-path cost dimension.
 
 Report only concrete read-path performance risks visible from changed Go or SQL code.
 
