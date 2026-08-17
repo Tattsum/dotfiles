@@ -6,7 +6,6 @@
       "WebFetch(domain:play.google.com)"
     ]
   },
-  "model": "opus[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -18,7 +17,8 @@
   },
   "enabledPlugins": {
     "gopls-lsp@claude-plugins-official": true,
-    "claude-code-setup@claude-plugins-official": true
+    "claude-code-setup@claude-plugins-official": true,
+    "swift-lsp@claude-plugins-official": true
   },
   "advisorModel": "opus"
 }
