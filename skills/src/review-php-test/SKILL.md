@@ -6,7 +6,7 @@ allowed-tools: [Bash, Read, Grep, Glob, Agent]
 
 # /review-php-test
 
-Review PHP / Laravel (PHPUnit) changes against `<base>...HEAD` using two independent test-focused subagents. This is review-only: do not modify files.
+Review PHP / Laravel (PHPUnit) changes against `<base>...HEAD` using three independent test-focused subagents. This is review-only: do not modify files.
 
 ## Input
 
@@ -34,8 +34,8 @@ skill-resolve-diff --base <base> -- '*.php'
 3. Stop with `レビュー対象の PHP ファイルがありません` if no PHP files changed. テストファイルが差分に無い場合は、本来テストが必要な変更（ロジック・entity メソッド・新規エンドポイント）にテストが欠けていないかを指摘対象にする。
 4. Store `files` as `<TARGET_FILES>` and `diff` as `<DIFF_CONTEXT>`. When `truncated` is true, keep `truncated_files` as `<TRUNCATED_FILES>`, pass it to every subagent, and report the truncation and the dropped file list to the user. Never drop them silently: the cut point moves as commits land, so silent truncation changes review coverage between runs on the same PR.
 5. Read `references/focus-blocks.md`. Stop if it cannot be read: report the path and tell the user to run `./install.sh` to re-link the skills. Never review with a partially loaded focus set — "no findings for this focus" and "this focus never ran" are indistinguishable in the output, so a re-review of the same PR would silently drop last run's findings.
-6. Dispatch exactly two `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
-7. Wait for both subagents before integrating results.
+6. Dispatch exactly three `general-purpose` subagents in one assistant message, one per focus block. Do not run them sequentially or replace them with inline review. If Agent is unavailable, report that this skill must be invoked directly from the user session and stop.
+7. Wait for all three subagents before integrating results.
 
 ## Subagent Prompt Shape
 
@@ -74,7 +74,7 @@ Each subagent receives the shared context below plus one focus block from `refer
 
 ## Integration
 
-After both subagents return:
+After all three subagents return:
 
 1. Count findings by focus group.
 2. Verify each finding references a file in `<TARGET_FILES>`; separate out-of-scope findings with a warning.
