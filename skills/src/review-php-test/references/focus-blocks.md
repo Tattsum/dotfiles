@@ -17,16 +17,23 @@ Review テスト命名・構造.
 
 Report only concrete test-readability or correctness risks.
 
-## Focus B: Test Strategy And Quality
+## Focus B: Test Strategy
 
-Review テスト戦略・品質（偽陰性・偽陽性の排除）.
+Review テスト戦略（何をどこまでテストするか）.
 
-- DB テストは `DatabaseTransactions` を優先しているか（`RefreshDatabase` は避ける）。DB 書き込みは `assertDatabaseHas` で検証しているか。`assertDatabaseHas` / `assertDatabaseMissing` の第1引数はテーブル名文字列でなく対応する `Model::class` を渡しているか（IDE 補完・リネーム追従。対応モデルが存在する場合のみ）。レコードが存在しないことの検証は `assertDatabaseMissing` を使っているか。
-- JSON レスポンスの検証は `assertJson` でなく `assertExactJson` を使い、フィールドの過不足を検知しているか。
 - モックは外部依存（外部 API / ファイル / メール / 決済）のみ。同一アプリ内のサービス・Eloquent・内部ビジネスロジックをモックしていないか。
 - 単体テストに実 API / 実 DB を叩く分岐（`if (env('USE_REAL_API'))` 等）を入れていないか。実 API テストは `tests/Integration/` に別クラスで分離されているか。
 - 内部実装（特定メソッドが呼ばれたか）でなく、振る舞い（戻り値・DB 状態変化・外部 API 呼び出し）を検証しているか。
 - ハッピーパス以外（エラー系・境界値: ページ境界・日時範囲・空リスト・上限値）のケースがあるか。ロジック（条件分岐・計算・変換）を持つ関数、entity / value object のメソッドにテストがあるか（単純な getter/mapping は不要）。
+
+Report only concrete test-strategy gaps, not a demand for blanket coverage.
+
+## Focus C: Test Quality
+
+Review テスト品質（偽陰性・偽陽性の排除・データ安全性）.
+
+- DB テストは `DatabaseTransactions` を優先しているか（`RefreshDatabase` は避ける）。DB 書き込みは `assertDatabaseHas` で検証しているか。`assertDatabaseHas` / `assertDatabaseMissing` の第1引数はテーブル名文字列でなく対応する `Model::class` を渡しているか（IDE 補完・リネーム追従。対応モデルが存在する場合のみ）。レコードが存在しないことの検証は `assertDatabaseMissing` を使っているか。
+- JSON レスポンスの検証は `assertJson` でなく `assertExactJson` を使い、フィールドの過不足を検知しているか。
 - 偽陰性の排除: 期待値・テストデータにゼロ値（`0`/`""`/`false`/`nil`）を使っていないか（初期化漏れと区別がつかない。`42`/`"test_value"` を使う）。integration test のテストデータにプロダクションコードの定数を使わず文字列リテラル直書きにしているか。
 - 偽陽性の排除: `assertNotNull`/`assertNotEmpty`/`Len` だけで済ませず具体値で assert しているか。assert 粒度がテスト対象に関係するフィールドに絞られているか（全フィールド厳密 assert は偽陽性、粗すぎは見逃し）。
 - テストデータの安全性: 電話番号は実在し得ない未割り当て帯（日本の携帯なら `090-0000-xxxx` 帯）、メールは `example.com` を使い、特定人物の名前・メールを埋め込んでいないか。
