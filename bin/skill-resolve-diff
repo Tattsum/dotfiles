@@ -1,0 +1,108 @@
+#!/usr/bin/env bash
+
+# review skill 群がレビュー範囲を決めるための共通スクリプト。
+# base ブランチの解決・変更ファイル一覧・差分本文・言語判定を1回で返す。
+#
+# 同じコマンド列が 22 の SKILL.md に散っており、origin/main へのフォールバックは
+# php 系 6 件と3オーケストレーターにしか書かれていなかった（go 6 件・ts 6 件は欠落）。
+# 散文で同じ手順を22回書くと必ずこの種のドリフトが起きるため、決定的な部分だけを
+# ここに集約する。重大度判定・仕様適合・意味的な重複排除は判断を伴うので持ち込まない。
+#
+# Usage:
+#   skill-resolve-diff [--base <ref>] [--max-chars <n>] [-- <pathspec>...]
+#
+# Output: stdout に JSON 1 オブジェクト
+#   base            解決された base ref
+#   files           変更ファイル（pathspec 適用後）の配列
+#   languages       検出言語の配列（go / php / ts）
+#   diff            差分本文（max-chars で末尾切り詰め）
+#   truncated       切り詰めが起きたか
+#   truncated_files 差分本文から落ちたファイルの配列（Read で補完させるため）
+
+set -euo pipefail
+
+base=""
+max_chars=60000
+pathspec=()
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --base)      base="${2:-}"; shift 2 ;;
+    --max-chars) max_chars="${2:-}"; shift 2 ;;
+    --)          shift; pathspec=("$@"); break ;;
+    *)           echo "不明な引数: $1" >&2; exit 2 ;;
+  esac
+done
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  echo "git リポジトリではありません" >&2
+  exit 1
+fi
+
+# base 未指定なら origin/master → origin/main の順に解決する。
+if [ -z "$base" ]; then
+  for candidate in origin/master origin/main; do
+    if git rev-parse --verify --quiet "$candidate" >/dev/null 2>&1; then
+      base="$candidate"
+      break
+    fi
+  done
+fi
+
+if [ -z "$base" ]; then
+  echo "base ブランチを解決できません（origin/master・origin/main のいずれも存在しない）" >&2
+  exit 1
+fi
+
+if ! git rev-parse --verify --quiet "$base" >/dev/null 2>&1; then
+  echo "ブランチ $base が見つかりません" >&2
+  exit 1
+fi
+
+# pathspec は git に素のまま渡す。展開はシェルでなく git にさせる（'*.go' 等の
+# glob をシェルが cwd のファイル名に置換してしまうと、対象が黙って空になる）。
+# 空配列を "${a[@]}" で参照すると bash 3.2 + set -u が落ちるため分岐する。
+if [ ${#pathspec[@]} -eq 0 ]; then
+  files="$(git diff --name-only "$base...HEAD")"
+  diff_all="$(git diff "$base...HEAD")"
+else
+  files="$(git diff --name-only "$base...HEAD" -- "${pathspec[@]}")"
+  diff_all="$(git diff "$base...HEAD" -- "${pathspec[@]}")"
+fi
+
+# 切り詰めは残す（15並列サブエージェント全員に巨大差分を配るとコストが線形に伸びる）。
+# ただし「どこで切れたか」を出力し、落ちたファイルは呼び出し側が Read で補完できるようにする。
+# 切断位置は commit が増えるたびに動くため、黙って落とすと実行ごとにレビュー結果が変わる。
+truncated=false
+truncated_files=""
+diff_out="$diff_all"
+if [ "${#diff_all}" -gt "$max_chars" ]; then
+  truncated=true
+  diff_out="${diff_all:0:$max_chars}"
+  kept="$(printf '%s\n' "$diff_out" | rg -o '^\+\+\+ b/(.*)$' -r '$1' || true)"
+  truncated_files="$(comm -23 \
+    <(printf '%s\n' "$files" | rg -v '^$' | sort -u) \
+    <(printf '%s\n' "$kept"  | rg -v '^$' | sort -u))"
+fi
+
+# 拡張子から言語を判定する。結果は言語別オーケストレーターの選択にのみ使う。
+languages=""
+if printf '%s\n' "$files" | rg -q '\.(go|sql|proto)$'; then languages="$languages"$'\n'"go"; fi
+if printf '%s\n' "$files" | rg -q '\.php$'; then languages="$languages"$'\n'"php"; fi
+if printf '%s\n' "$files" | rg -q '\.(ts|tsx|vue|js|jsx)$'; then languages="$languages"$'\n'"ts"; fi
+
+# 空行を落として JSON 配列にする。パイプで繋ぐと空入力時に pipefail と
+# フォールバックが二重に発火するため、jq 1 プロセスで完結させる。
+to_json_array() {
+  printf '%s' "${1:-}" | jq -Rsc 'split("\n") | map(select(. != ""))'
+}
+
+jq -n \
+  --arg base "$base" \
+  --argjson files "$(to_json_array "$files")" \
+  --argjson languages "$(to_json_array "$languages")" \
+  --arg diff "$diff_out" \
+  --argjson truncated "$truncated" \
+  --argjson truncated_files "$(to_json_array "$truncated_files")" \
+  '{base: $base, files: $files, languages: $languages, diff: $diff,
+    truncated: $truncated, truncated_files: $truncated_files}'

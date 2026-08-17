@@ -36,7 +36,10 @@ mkdir -p "$HOME/.claude/skills" "$HOME/.cursor/skills"
 for skill_dir in "$DOTFILES_DIR"/skills/src/*/; do
   [ -d "$skill_dir" ] || continue
   skill_name="$(basename "$skill_dir")"
-  # ディレクトリリンクは -n を付けて既存リンク先への潜り込みを防ぐ
+  # 配置前に rm -rf する。ln -sfn は宛先が実ディレクトリの場合エラーにならず、
+  # ディレクトリの「中」に symlink を作って入れ子（dest/name/name）を生やすため、
+  # -n だけでは過去の cp 配置や前回の入れ子が残り続ける。
+  rm -rf "$HOME/.claude/skills/$skill_name" "$HOME/.cursor/skills/$skill_name"
   ln -sfn "$skill_dir" "$HOME/.claude/skills/$skill_name"
   ln -sfn "$skill_dir" "$HOME/.cursor/skills/$skill_name"
   echo "  ✅ $HOME/.claude/skills/$skill_name -> $skill_dir"
@@ -86,6 +89,15 @@ echo "------------------------------"
 echo "🚀 ide スクリプトをリンクします..."
 echo "------------------------------"
 link_file "$DOTFILES_DIR/bin/ide" "$HOME/.local/bin/ide"
+
+echo ""
+echo "------------------------------"
+echo "🧰 skill から呼ぶ共有スクリプトをリンクします..."
+echo "------------------------------"
+# skill ディレクトリ内ではなく PATH 上に置く。skill は ~/.claude/skills・
+# ~/.cursor/skills・TARGET/.cursor/skills の3系統に配られるため、skill 内に
+# 置くと参照側にパス解決のフォールバックが要る。コマンド名で呼べば1行で済む。
+link_file "$DOTFILES_DIR/bin/skill-resolve-diff" "$HOME/.local/bin/skill-resolve-diff"
 
 echo ""
 echo "------------------------------"
