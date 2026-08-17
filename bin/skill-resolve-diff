@@ -34,6 +34,20 @@ while [ $# -gt 0 ]; do
   esac
 done
 
+# 非数値の --max-chars は、bash の `[ n -gt abc ]` が偽になるだけで無言で通り、
+# 切り詰めを丸ごと無効化してしまう。このスクリプトが潰したいのは「黙って
+# レビュー範囲が変わる」ことなので、入力不正はここで落とす。
+case "$max_chars" in
+  ''|*[!0-9]*) echo "--max-chars は正の整数で指定してください: $max_chars" >&2; exit 2 ;;
+esac
+
+for cmd in git jq rg; do
+  if ! command -v "$cmd" >/dev/null 2>&1; then
+    echo "$cmd が見つかりません。インストールしてから再実行してください" >&2
+    exit 1
+  fi
+done
+
 if ! git rev-parse --git-dir >/dev/null 2>&1; then
   echo "git リポジトリではありません" >&2
   exit 1
