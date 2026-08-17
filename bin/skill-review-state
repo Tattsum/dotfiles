@@ -1,0 +1,117 @@
+#!/usr/bin/env bash
+
+# PR に既に投稿されているレビュー状態を、再レビュー時の照合用に正規化して返す。
+#
+# 現行の SKILL.md は REST `pulls/{pr}/comments --paginate` だけを使っていたが、
+# このエンドポイントは isResolved / isOutdated / thread の概念を一切返さない。
+# 実測（fastmedia/signa#223）では 52 thread 中 47 が解決済み・26 が outdated で、
+# 「人間が対応不要と判断した論点」が再レビュー側から完全に不可視だった。これが
+# 同じ PR を2回レビューしたときに前回と矛盾する主因。
+#
+# 判断（同一性の最終判定・重大度・仕様適合）は持ち込まない。状態を集めるだけ。
+#
+# Usage:
+#   skill-review-state <owner/repo> <pr-number> [--me <login>]
+#
+# Output: stdout に JSON 1 オブジェクト
+#   me              自分の login
+#   threads[]       レビュースレッド
+#     path, line, original_line, is_resolved, is_outdated
+#     mine          先頭コメントが自分の投稿か
+#     badged        先頭コメントに shields.io の review バッジがあるか（AI 投稿の判別子）
+#     has_human_reply 自分以外の返信が付いているか
+#     first_comment_id / body_head  返信先の特定と観点の突き合わせ用
+#   issue_comments[] PR 会話欄のコメント。「対応不要」がここに書かれることがあり、
+#                    レビュースレッドだけ見ていると必ず見落とす。
+
+set -euo pipefail
+
+if [ $# -lt 2 ]; then
+  echo "Usage: skill-review-state <owner/repo> <pr-number> [--me <login>]" >&2
+  exit 2
+fi
+
+repo="$1"; pr="$2"; shift 2
+me=""
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --me) me="${2:-}"; shift 2 ;;
+    *)    echo "不明な引数: $1" >&2; exit 2 ;;
+  esac
+done
+
+owner="${repo%%/*}"
+name="${repo##*/}"
+if [ -z "$owner" ] || [ -z "$name" ] || [ "$owner" = "$name" ]; then
+  echo "リポジトリは owner/repo 形式で指定してください: $repo" >&2
+  exit 2
+fi
+
+[ -n "$me" ] || me="$(gh api user -q .login)"
+
+# reviewThreads も、その配下の comments も、どちらも pageInfo を辿らないと
+# 黙って1ページ目だけが返る。返信が 100 件を超えるスレッドでは、人間が後から
+# 書いた「対応不要」を取りこぼす。両方のカーソルを明示的に回す。
+threads='[]'
+cursor="null"
+while :; do
+  page="$(gh api graphql \
+    -f owner="$owner" -f name="$name" -F number="$pr" -f cursor="$cursor" \
+    -f query='
+      query($owner:String!, $name:String!, $number:Int!, $cursor:String) {
+        repository(owner:$owner, name:$name) {
+          pullRequest(number:$number) {
+            reviewThreads(first:100, after:$cursor) {
+              pageInfo { hasNextPage endCursor }
+              nodes {
+                isResolved isOutdated path line originalLine
+                comments(first:100) {
+                  pageInfo { hasNextPage endCursor }
+                  nodes { databaseId body author { login } }
+                }
+              }
+            }
+          }
+        }
+      }')"
+
+  printf '%s' "$page" | jq -e '.data.repository.pullRequest' >/dev/null 2>&1 || {
+    echo "PR を取得できません: $repo#$pr" >&2
+    printf '%s' "$page" | jq -r '.errors[]?.message // empty' >&2
+    exit 1
+  }
+
+  threads="$(jq -n \
+    --argjson acc "$threads" \
+    --argjson page "$(printf '%s' "$page" | jq '.data.repository.pullRequest.reviewThreads.nodes')" \
+    '$acc + $page')"
+
+  has_next="$(printf '%s' "$page" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.hasNextPage')"
+  [ "$has_next" = "true" ] || break
+  cursor="$(printf '%s' "$page" | jq -r '.data.repository.pullRequest.reviewThreads.pageInfo.endCursor')"
+done
+
+# 返信が 100 件を超えるスレッドは、その事実を落とさず truncated_replies で伝える。
+# 黙って切ると「人間の返信が無い」と誤判定して再提起してしまう。
+issue_comments="$(gh api "repos/$repo/issues/$pr/comments" --paginate \
+  --jq '[.[] | {id, login: .user.login, body}]' | jq -sc 'add // []')"
+
+jq -n \
+  --arg me "$me" \
+  --argjson threads "$threads" \
+  --argjson issue_comments "$issue_comments" \
+  '{
+    me: $me,
+    threads: ($threads | map({
+      path, line, original_line: .originalLine,
+      is_resolved: .isResolved,
+      is_outdated: .isOutdated,
+      first_comment_id: (.comments.nodes[0].databaseId // null),
+      mine: ((.comments.nodes[0].author.login // "") == $me),
+      badged: ((.comments.nodes[0].body // "") | test("img\\.shields\\.io/badge/review-")),
+      has_human_reply: ([.comments.nodes[1:][] | select((.author.login // "") != $me)] | length > 0),
+      truncated_replies: .comments.pageInfo.hasNextPage,
+      body_head: ((.comments.nodes[0].body // "")[0:400])
+    })),
+    issue_comments: $issue_comments
+  }'
