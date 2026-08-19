@@ -18,6 +18,7 @@ skills/
 ├── Makefile
 └── src/
     ├── dotfiles-plan-first/SKILL.md            # 実装着手前の標準WF（調査→技術選定→検証→/grill-me合意→実装）
+    ├── dotfiles-atlassian-investigate/SKILL.md # Jira/Confluence の URL 起点で調査し回答草案まで（読み取り専用・投稿しない）
     ├── dotfiles-commit-push/SKILL.md           # 秘密情報チェック + コミット規約を強制して commit / push
     ├── dotfiles-pr-create/SKILL.md             # push 済みブランチから PR を作成（既定 draft, base 自動判定）
     ├── dotfiles-lint-and-test/SKILL.md         # リポジトリ標準の lint / format / test を特定して実行
