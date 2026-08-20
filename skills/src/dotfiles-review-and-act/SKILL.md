@@ -25,9 +25,18 @@ PR をレビューし、**所有者で次アクションを振り分ける**エ�
 ```bash
 # 認証中の自分のアカウント
 gh api user -q .login
-# 対象 PR（引数指定が無ければ現在ブランチから解決）。base リポジトリ側で投稿するため base 情報も取る。
-# body は次節のコンテキスト収集で使う（リンク抽出元）
-gh pr view [<PR番号 or URL>] --json number,author,url,headRefName,baseRepository,isCrossRepository,body
+# 対象 PR（引数指定が無ければ現在ブランチから解決）。body は次節のコンテキスト収集で使う（リンク抽出元）。
+# base 側は baseRefName だけを取る。gh には base リポジトリを返すフィールドが無く
+# （headRepository / headRepositoryOwner は head 側専用）、baseRepository を渡すと
+# Unknown JSON field で即座に落ちてこのコマンド自体が失敗する。
+gh pr view [<PR番号 or URL>] --json number,author,url,headRefName,baseRefName,isCrossRepository,body
+```
+
+**投稿先の `owner/repo`**（「コメント投稿手順」の `skill-review-state <owner/repo> <pr番号>` と REST 呼び出しに渡す値）は、上で取得した `url`（`https://github.com/<owner>/<repo>/pull/<N>`）から導く。PR は必ず base リポジトリ側に存在するため、fork からの PR（`isCrossRepository == true`）でもこの url は base 側を指す。`headRepositoryOwner` を使うと fork 元へ投稿しようとして失敗する。
+
+```bash
+gh pr view [<PR番号 or URL>] --json url \
+  -q '.url | capture("github\\.com/(?<repo>[^/]+/[^/]+)/pull/") | .repo'
 ```
 
 - `author.login == 自分の login` → **自分 PR（改修モード）**
