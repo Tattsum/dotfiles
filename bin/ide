@@ -24,8 +24,10 @@ if [[ "$branch" =~ ^(deploy|feature|fix|hotfix|bugfix|release|refactor|chore|doc
 elif [[ "$branch" =~ ^(main|master|develop|dev|staging|production|prod)$ ]]; then
     branch_type="$branch"
 else
-    # その他の場合は最初の単語または最初の10文字を使用
-    branch_type=$(echo "$branch" | cut -d'-' -d'/' -f1 | head -c 10)
+    # cut は -d を複数取れず最後の1つしか効かない（-d'-' -d'/' では '/' だけが有効に
+    # なり '-' 区切りが無視される）ため、シェルのパラメータ展開で両方を区切りとして扱う。
+    branch_type="${branch%%[-/]*}"
+    branch_type="${branch_type:0:10}"
 fi
 
 session_name="${project_name}-${branch_type}"

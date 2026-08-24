@@ -54,6 +54,11 @@ alias -g G='| grep'
 # PATH やツールの初期化はここに追記
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.local/bin:$HOME/go/bin:$PATH"
 
+# zellij の socket dir。既定の $TMPDIR は macOS では長く、Unix socket の sun_path 上限
+# （104 byte）をパス側で食い潰してセッション名が ~24 字に制限される。bin/ide 側は
+# ${ZELLIJ_SOCKET_DIR:-...} でここを正本として参照するため、値を変えるときは両方を揃える。
+export ZELLIJ_SOCKET_DIR="/tmp/zellij-$(id -u)"
+
 # Go プロジェクトのパス（`cd $atami` のように移動先として使う）
 export fastmedia="$HOME/go/src/github.com/fastmedia"
 export atami="$fastmedia/atami"

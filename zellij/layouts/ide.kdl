@@ -4,7 +4,7 @@ layout {
             plugin location="tab-bar"
         }
         children
-        pane size=2 borderless=true {
+        pane size=1 borderless=true {
             plugin location="status-bar"
         }
     }
@@ -15,9 +15,9 @@ layout {
                 pane focus=true name="Editor" {
                     command "hx"
                 }
-                pane size="40%" name="Implement"
+                pane size="50%" name="Implement"
             }
-            pane size="30%" name="Review"
+            pane size="40%" name="Review"
         }
     }
 }

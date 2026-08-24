@@ -1,5 +1,8 @@
 [aws]
-format = '\[[$symbol($profile)(\($region\))(\[$duration\])]($style)\]'
+format = '\[[$symbol($region)]($style)\]'
+
+[buf]
+format = '\[[$symbol($version)]($style)\]'
 
 [bun]
 format = '\[[$symbol($version)]($style)\]'
@@ -54,9 +57,12 @@ format = '\[[$symbol$branch]($style)\]'
 
 [gcloud]
 format = '\[[$symbol$account(@$domain)(\($region\))]($style)\]'
+disabled = true
 
 [git_branch]
 format = '\[[$symbol$branch]($style)\]'
+truncation_length = 20
+truncation_symbol = '…'
 
 [git_status]
 format = '([\[$all_status$ahead_behind\]]($style))'
@@ -95,6 +101,9 @@ format = '\[[$symbol($version)]($style)\]'
 format = '\[[$symbol$context( \($namespace\))]($style)\]'
 
 [lua]
+format = '\[[$symbol($version)]($style)\]'
+
+[maven]
 format = '\[[$symbol($version)]($style)\]'
 
 [memory_usage]
