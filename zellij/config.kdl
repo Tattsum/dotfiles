@@ -6,3 +6,15 @@ default_layout "ide"
 // 消えた後の `ide` 実行時に毎回 ide レイアウトで新規作成され、hx が起動した状態で開く。
 session_serialization false
 
+// ペイン枠を「タイトルのみ」ではなく完全な枠で描く。
+// 省略すると zellij 0.45 の既定 "titles" になり、タイトル行が空白で塗られるだけで
+// 罫線が出ず、隣接ペインの共有境界しか線にならない（どこからどこまでが Editor で
+// どこが Implement なのか見分けられない）。
+// 枠の代償は 146x38 での実測で次の通り。Editor は "titles" でもタイトル行と境界行を
+// すでに消費していたため行数不変（16行）。Implement は status-bar と接する下端に枠が
+// 入るため 17行 → 16行。桁は左カラム 87 → 86、Review 58 → 56。
+// Implement の行数と Review の桁数はどちらも直前の調整で稼いだ側なので、枠の可読性と
+// のトレードオフであることを承知の上で枠を採る。
+// pane_frames false / "none" は却下: 枠が消えるのは当然として、タイトルまで消えるため
+// Editor / Implement / Review の識別子ごと失われる。
+pane_frame_style "full"
