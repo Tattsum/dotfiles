@@ -1,0 +1,152 @@
+#!/usr/bin/env bash
+
+# ~/.claude/nippo/YYYY-MM-DD.md を Notion の日記 DB へ 1 ページとして投稿する。
+# dotfiles-nippo skill の投稿モードから呼ばれる。
+#
+# 日報の中身は解釈しない。md を丸ごと `markdown` パラメータに載せて運ぶだけ。セクション構造を
+# 読み始めると、テンプレートの書式を変えた瞬間にこちらが壊れる。ローカル md と Notion ページの
+# 節を 1:1 に保つ設計（先頭に日付見出しを置かない）は、この「運ぶだけ」を成立させるためにある。
+#
+# 「明日の問い」の空欄チェックもここではやらない。空欄の検知と警告は呼び出し側（モデル）の責務。
+# 同じ理由で、空欄でも投稿を止めない。
+#
+# Notion 側の実測（2026-08-25・Notion-Version: 2026-03-11）:
+#   `#` → heading_1 / `-` → bulleted_list_item / `- [ ]` → to_do / 空見出しは空のまま残る。
+# よって md→blocks の変換器は要らず、curl + jq で足りる（Notion MCP も変換ライブラリも入れない）。
+#
+# data source ID は設定に持たせず、DB ID から `GET /v1/databases/{id}` で毎回解決する。手元の
+# 控えと Notion 側がずれるのを防ぐため。DB に data source が 2 つ以上あるときは推測せずに落とす。
+#
+# 重複排除はタイトルの完全一致で行う。日記 DB の日付列（`作成日`）は created_time 型で書き込めず、
+# 投稿日が入ってしまうため鍵に使えない。`/v1/search` は反映が遅れるので使わない。
+# data source への query は決定的なのでこれだけが唯一の信頼できる鍵になる。
+#
+# token は環境変数からのみ受け取り、curl へは `-K -`（設定を stdin 経由）で渡す。コマンドライン
+# 引数に載せると `ps` から見える。加えて、このスクリプトを呼ぶ skill の入力はセッションログ自身
+# なので、コマンド列に載せた token は翌日の digest に入り Notion へ投稿されうる（再帰ハザード）。
+#
+# Usage:
+#   skill-nippo-notion-post <markdown-file> [--date YYYY-MM-DD] [--dry-run]
+#
+#   --date     省略時はファイル名（YYYY-MM-DD.md）から導く
+#   --dry-run  読み取りと重複チェックまで行い、投稿するはずのボディを出して終わる
+#
+# Env:
+#   NIPPO_NOTION_TOKEN        internal integration token（必須）
+#   NIPPO_NOTION_DATABASE_ID  投稿先 DB の ID（必須）
+#   NIPPO_NOTION_TAG          付与する multi_select タグ（既定: 仕事のこと）
+#
+# Exit:
+#   0  作成した / --dry-run が通った
+#   3  同じタイトルのページが既にある（URL を出して何もしない）
+#   2  引数・環境変数の不備
+#   1  API エラー
+
+set -euo pipefail
+
+API="https://api.notion.com/v1"
+VERSION="2026-03-11"
+TAG="${NIPPO_NOTION_TAG:-仕事のこと}"
+FILE=""
+DAY=""
+DRY_RUN=0
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --date) DAY="${2:-}"; shift 2 ;;
+    --dry-run) DRY_RUN=1; shift ;;
+    -h|--help) awk 'NR > 1 { if (/^#/) { sub(/^# ?/, ""); print; seen = 1 } else if (seen) exit }' "$0"
+               exit 0 ;;
+    -*) echo "unknown option: $1" >&2; exit 2 ;;
+    *) FILE="$1"; shift ;;
+  esac
+done
+
+[ -n "$FILE" ] || { echo "markdown ファイルを指定してください" >&2; exit 2; }
+[ -f "$FILE" ] || { echo "ファイルがありません: $FILE" >&2; exit 2; }
+[ -n "${NIPPO_NOTION_TOKEN:-}" ] || { echo "NIPPO_NOTION_TOKEN が未設定です（~/.zshrc.local）" >&2; exit 2; }
+[ -n "${NIPPO_NOTION_DATABASE_ID:-}" ] || { echo "NIPPO_NOTION_DATABASE_ID が未設定です（~/.zshrc.local）" >&2; exit 2; }
+
+if [ -z "$DAY" ]; then
+  DAY="$(basename "$FILE" .md)"
+fi
+case "$DAY" in
+  [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+  *) echo "日付が YYYY-MM-DD になっていません: $DAY（--date で指定してください）" >&2; exit 2 ;;
+esac
+
+TITLE="日報 $DAY"
+
+# curl の共通口。token を argv に載せないため、認証ヘッダは -K - で stdin から渡す。
+notion() {
+  local method="$1" path="$2" body="${3:-}"
+  local -a args=(-sS -K - -X "$method"
+                 -H "Notion-Version: $VERSION"
+                 -H "Content-Type: application/json"
+                 -w '\n%{http_code}')
+  [ -n "$body" ] && args+=(--data "$body")
+  printf 'header = "Authorization: Bearer %s"\n' "$NIPPO_NOTION_TOKEN" \
+    | curl "${args[@]}" "$API$path"
+}
+
+# 応答は「本文 + 最終行に HTTP status」で返る。status を切り離し、2xx 以外はここで落とす。
+check() {
+  local raw="$1" what="$2"
+  local status body
+  status="$(printf '%s' "$raw" | tail -n 1)"
+  body="$(printf '%s' "$raw" | sed '$d')"
+  case "$status" in
+    2*) printf '%s' "$body" ;;
+    *)  echo "$what に失敗しました (HTTP $status)" >&2
+        printf '%s' "$body" | jq -r '"  code: \(.code // "-")\n  message: \(.message // "-")"' >&2 2>/dev/null \
+          || printf '%s\n' "$body" >&2
+        exit 1 ;;
+  esac
+}
+
+DB_JSON="$(check "$(notion GET "/databases/$NIPPO_NOTION_DATABASE_ID")" "DB の取得")"
+DS_COUNT="$(printf '%s' "$DB_JSON" | jq '.data_sources | length')"
+if [ "$DS_COUNT" != "1" ]; then
+  echo "DB の data source が $DS_COUNT 件あります。どれに投稿すべきか判断できないので中断します" >&2
+  printf '%s' "$DB_JSON" | jq -r '.data_sources[] | "  \(.id)  \(.name)"' >&2
+  exit 1
+fi
+DS_ID="$(printf '%s' "$DB_JSON" | jq -r '.data_sources[0].id')"
+
+# タイトル列の名前は DB 側の都合で変わる（この DB は "Name"）。設定に持たせるとずれるので毎回引く。
+SCHEMA_JSON="$(check "$(notion GET "/data_sources/$DS_ID")" "スキーマの取得")"
+TITLE_PROP="$(printf '%s' "$SCHEMA_JSON" | jq -r '.properties | to_entries[] | select(.value.type == "title") | .key')"
+[ -n "$TITLE_PROP" ] || { echo "title 型のプロパティが見つかりません" >&2; exit 1; }
+HAS_TAG_PROP="$(printf '%s' "$SCHEMA_JSON" \
+  | jq -r --arg t "$TAG" '[.properties | to_entries[] | select(.value.type == "multi_select")
+      | select([.value.multi_select.options[].name] | index($t))] | length')"
+
+QUERY="$(jq -n --arg p "$TITLE_PROP" --arg t "$TITLE" \
+  '{filter: {property: $p, title: {equals: $t}}, page_size: 1}')"
+FOUND="$(check "$(notion POST "/data_sources/$DS_ID/query" "$QUERY")" "既存ページの検索")"
+if [ "$(printf '%s' "$FOUND" | jq '.results | length')" != "0" ]; then
+  echo "同じタイトルのページが既にあります: $TITLE" >&2
+  printf '%s' "$FOUND" | jq -r '.results[0].url'
+  exit 3
+fi
+
+BODY="$(jq -n \
+  --arg ds "$DS_ID" \
+  --arg prop "$TITLE_PROP" \
+  --arg title "$TITLE" \
+  --arg tag "$TAG" \
+  --argjson has_tag "$HAS_TAG_PROP" \
+  --rawfile md "$FILE" \
+  '{parent: {type: "data_source_id", data_source_id: $ds},
+    properties: ({($prop): {title: [{text: {content: $title}}]}}
+                 + (if $has_tag > 0 then {"タグ": {multi_select: [{name: $tag}]}} else {} end)),
+    markdown: $md}')"
+
+if [ "$DRY_RUN" = "1" ]; then
+  echo "--- dry-run: 投稿せずに終了します ---" >&2
+  printf '%s\n' "$BODY" | jq '.markdown |= (split("\n") | length | tostring + " 行")'
+  exit 0
+fi
+
+CREATED="$(check "$(notion POST "/pages" "$BODY")" "ページの作成")"
+printf '%s' "$CREATED" | jq -r '.url'
