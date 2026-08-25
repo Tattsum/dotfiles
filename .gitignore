@@ -1,2 +1,11 @@
 .DS_Store
 *.local
+
+# prompt-pattern-scan の生成物。history.jsonl（プロンプト全件）の派生物で社内固有名を含む。
+# 正規の置き場は ~/.claude/prompt-patterns/ で、この repo は public なため誤って持ち込まない。
+claude/prompt-patterns/state.json
+claude/prompt-patterns/state*.json
+claude/prompt-patterns/classification-rules.json*
+claude/prompt-patterns/report-latest.md*
+claude/prompt-patterns/*.log
+claude/prompt-patterns/*.bak-*

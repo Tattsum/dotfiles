@@ -1,0 +1,81 @@
+#!/usr/bin/env bash
+#
+# launchd/*.plist を ~/Library/LaunchAgents/ へ配置し、登録し直す。
+#
+# Usage: install-launchagent [<label> ...]
+#        引数なしで launchd/ 配下の全 plist を対象にする。
+#
+# install.sh から分離してある。symlink を張るだけの install.sh と違い、ここはユーザー単位の
+# システム状態を変更し、リポジトリ外の要因で失敗し得るため、install.sh 本体を巻き込ませない。
+# plist を編集したあと登録だけやり直したい場面でも単独で叩ける。
+
+set -uo pipefail
+
+DOTFILES_DIR="$(cd "$(dirname "$0")/.." && pwd)"
+SRC_DIR="$DOTFILES_DIR/launchd"
+DEST_DIR="$HOME/Library/LaunchAgents"
+DOMAIN="gui/$(id -u)"
+
+if ! command -v launchctl >/dev/null 2>&1; then
+  echo "  ⏭ launchctl が見つからないためスキップ（macOS 以外）"
+  exit 0
+fi
+
+mkdir -p "$DEST_DIR"
+
+# symlink にしない。launchd は bootstrap 時に plist の内容をキャッシュするため、リンク先を
+# 編集しても反映されず「直したのに変わらない」が起きる。どのみち再登録が要るので実体を置く。
+install_plist() {
+  local src="$1"
+  local label dest
+  label="$(basename "$src" .plist)"
+  dest="$DEST_DIR/$label.plist"
+
+  cp -f "$src" "$dest" || { echo "  ❌ $label: コピーに失敗"; return 1; }
+
+  # 未ロードへの bootout は exit 3 を返すので握り潰す。bootstrap 側は握り潰さない
+  # （二重ロードと disable 済みがどちらも exit 5 で、真因が見えなくなるため）。
+  launchctl bootout "$DOMAIN/$label" 2>/dev/null || true
+
+  if launchctl bootstrap "$DOMAIN" "$dest"; then
+    # 全角の閉じ括弧は変数名の一部として解釈されるため、${} で明示的に区切る
+    echo "  ✅ $label を登録しました（${dest}）"
+    return 0
+  fi
+
+  # enable は自動では呼ばない。システム設定 → ログイン項目でユーザーが意図的にオフにした
+  # 選択を、install.sh の再実行のたびに黙って踏み潰すことになるため。
+  echo "  ❌ $label: bootstrap に失敗しました"
+  echo "     過去に無効化していた場合は次を実行してから再試行してください:"
+  echo "       launchctl enable $DOMAIN/$label"
+  return 1
+}
+
+targets=()
+if [ "$#" -gt 0 ]; then
+  for label in "$@"; do
+    targets+=("$SRC_DIR/$label.plist")
+  done
+else
+  for plist in "$SRC_DIR"/*.plist; do
+    [ -f "$plist" ] || continue
+    targets+=("$plist")
+  done
+fi
+
+if [ "${#targets[@]}" -eq 0 ]; then
+  echo "  ⏭ 対象の plist がありません（${SRC_DIR}）"
+  exit 0
+fi
+
+failed=0
+for plist in "${targets[@]}"; do
+  if [ ! -f "$plist" ]; then
+    echo "  ❌ $plist が存在しません"
+    failed=1
+    continue
+  fi
+  install_plist "$plist" || failed=1
+done
+
+exit "$failed"
