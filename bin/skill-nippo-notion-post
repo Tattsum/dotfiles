@@ -1,33 +1,40 @@
 #!/usr/bin/env bash
 
-# ~/.claude/nippo/YYYY-MM-DD.md を Notion の日記 DB へ 1 ページとして投稿する。
+# ~/.claude/nippo/YYYY-MM-DD.md を Notion の DB へ 1 ページとして投稿する。
 # dotfiles-nippo skill の投稿モードから呼ばれる。
 #
 # 日報の中身は解釈しない。md を丸ごと `markdown` パラメータに載せて運ぶだけ。セクション構造を
-# 読み始めると、テンプレートの書式を変えた瞬間にこちらが壊れる。ローカル md と Notion ページの
-# 節を 1:1 に保つ設計（先頭に日付見出しを置かない）は、この「運ぶだけ」を成立させるためにある。
+# 読み始めると、テンプレートの書式を変えた瞬間にこちらが壊れる。同じ理由で、ページタイトルに使う
+# 主題とアイコンも自分では決めず、`--topic` / `--icon` で受け取る（本文を読まないと決められない）。
 #
 # 「明日の問い」の空欄チェックもここではやらない。空欄の検知と警告は呼び出し側（モデル）の責務。
 # 同じ理由で、空欄でも投稿を止めない。
 #
-# Notion 側の実測（2026-08-25・Notion-Version: 2026-03-11）:
-#   `#` → heading_1 / `-` → bulleted_list_item / `- [ ]` → to_do / 空見出しは空のまま残る。
-# よって md→blocks の変換器は要らず、curl + jq で足りる（Notion MCP も変換ライブラリも入れない）。
+# Notion 側の実測（2026-08-26・Notion-Version: 2026-03-11）:
+#   `##` → heading_2 / `-` → bulleted_list_item / `- [ ]` → to_do / Markdown の表 → table /
+#   空見出しは空のまま残る。よって md→blocks の変換器は要らず、curl + jq で足りる
+#   （Notion MCP も変換ライブラリも入れない）。
 #
-# data source ID は設定に持たせず、DB ID から `GET /v1/databases/{id}` で毎回解決する。手元の
-# 控えと Notion 側がずれるのを防ぐため。DB に data source が 2 つ以上あるときは推測せずに落とす。
+# data source ID・プロパティ名はどちらも設定に持たせず、DB ID から毎回引く。手元に控えを持つと
+# Notion 側の変更とずれ、ずれたことに気づく手段が無い。DB に data source が 2 つ以上あるときは
+# 推測せずに落とす。
 #
-# 重複排除はタイトルの完全一致で行う。日記 DB の日付列（`作成日`）は created_time 型で書き込めず、
-# 投稿日が入ってしまうため鍵に使えない。`/v1/search` は反映が遅れるので使わない。
-# data source への query は決定的なのでこれだけが唯一の信頼できる鍵になる。
+# 重複排除は date 型プロパティの完全一致で行う。DB に date 型が無いときは失敗させて終わる。
+# タイトルの完全一致に退避する手もあるが、タイトルは主題入りの自由記述なのでスクリプトから
+# 再構成できず、鍵にならない。`/v1/search` は反映が遅れるので使わない。日付で問い合わせられる
+# ことがこの DB に date 型を足した理由そのものなので、無い状態で黙って投稿すると重複が積む。
+# なお `created_time` 型は投稿日が入るため、対象日の鍵には使えない（遡り投稿ができなくなる）。
 #
 # token は環境変数からのみ受け取り、curl へは `-K -`（設定を stdin 経由）で渡す。コマンドライン
 # 引数に載せると `ps` から見える。加えて、このスクリプトを呼ぶ skill の入力はセッションログ自身
 # なので、コマンド列に載せた token は翌日の digest に入り Notion へ投稿されうる（再帰ハザード）。
 #
 # Usage:
-#   skill-nippo-notion-post <markdown-file> [--date YYYY-MM-DD] [--dry-run]
+#   skill-nippo-notion-post <markdown-file> [--topic <主題>] [--icon <絵文字>]
+#                           [--date YYYY-MM-DD] [--dry-run]
 #
+#   --topic    ページタイトル。省略時は "日報 YYYY-MM-DD"
+#   --icon     ページアイコンの絵文字。省略時は 📝
 #   --date     省略時はファイル名（YYYY-MM-DD.md）から導く
 #   --dry-run  読み取りと重複チェックまで行い、投稿するはずのボディを出して終わる
 #
@@ -35,25 +42,30 @@
 #   NIPPO_NOTION_TOKEN        internal integration token（必須）
 #   NIPPO_NOTION_DATABASE_ID  投稿先 DB の ID（必須）
 #   NIPPO_NOTION_TAG          付与する multi_select タグ（既定: 仕事のこと）
+#   NIPPO_NOTION_ICON         --icon 省略時のアイコン（既定: 📝）
 #
 # Exit:
 #   0  作成した / --dry-run が通った
-#   3  同じタイトルのページが既にある（URL を出して何もしない）
+#   3  同じ日付のページが既にある（URL を出して何もしない）
 #   2  引数・環境変数の不備
-#   1  API エラー
+#   1  API エラー / DB に date 型プロパティが無い
 
 set -euo pipefail
 
 API="https://api.notion.com/v1"
 VERSION="2026-03-11"
 TAG="${NIPPO_NOTION_TAG:-仕事のこと}"
+ICON="${NIPPO_NOTION_ICON:-📝}"
 FILE=""
 DAY=""
+TOPIC=""
 DRY_RUN=0
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --date) DAY="${2:-}"; shift 2 ;;
+    --topic) TOPIC="${2:-}"; shift 2 ;;
+    --icon) ICON="${2:-}"; shift 2 ;;
     --dry-run) DRY_RUN=1; shift ;;
     -h|--help) awk 'NR > 1 { if (/^#/) { sub(/^# ?/, ""); print; seen = 1 } else if (seen) exit }' "$0"
                exit 0 ;;
@@ -75,7 +87,7 @@ case "$DAY" in
   *) echo "日付が YYYY-MM-DD になっていません: $DAY（--date で指定してください）" >&2; exit 2 ;;
 esac
 
-TITLE="日報 $DAY"
+[ -n "$TOPIC" ] || TOPIC="日報 $DAY"
 
 # curl の共通口。token を argv に載せないため、認証ヘッダは -K - で stdin から渡す。
 notion() {
@@ -113,33 +125,48 @@ if [ "$DS_COUNT" != "1" ]; then
 fi
 DS_ID="$(printf '%s' "$DB_JSON" | jq -r '.data_sources[0].id')"
 
-# タイトル列の名前は DB 側の都合で変わる（この DB は "Name"）。設定に持たせるとずれるので毎回引く。
 SCHEMA_JSON="$(check "$(notion GET "/data_sources/$DS_ID")" "スキーマの取得")"
-TITLE_PROP="$(printf '%s' "$SCHEMA_JSON" | jq -r '.properties | to_entries[] | select(.value.type == "title") | .key')"
+prop_of_type() {
+  printf '%s' "$SCHEMA_JSON" | jq -r --arg t "$1" \
+    'first(.properties | to_entries[] | select(.value.type == $t) | .key) // ""'
+}
+TITLE_PROP="$(prop_of_type title)"
+DATE_PROP="$(prop_of_type date)"
 [ -n "$TITLE_PROP" ] || { echo "title 型のプロパティが見つかりません" >&2; exit 1; }
-HAS_TAG_PROP="$(printf '%s' "$SCHEMA_JSON" \
-  | jq -r --arg t "$TAG" '[.properties | to_entries[] | select(.value.type == "multi_select")
-      | select([.value.multi_select.options[].name] | index($t))] | length')"
+if [ -z "$DATE_PROP" ]; then
+  echo "date 型のプロパティが見つかりません。重複排除の鍵が無いため中断します" >&2
+  echo "  Notion 側で date 型の列を 1 つ追加してください（created_time 型は投稿日が入るので使えません）" >&2
+  exit 1
+fi
+# タグ列の名前も決め打ちしない。指定タグを選択肢に持つ multi_select を探し、無ければタグを付けない。
+TAG_PROP="$(printf '%s' "$SCHEMA_JSON" \
+  | jq -r --arg t "$TAG" 'first(.properties | to_entries[] | select(.value.type == "multi_select")
+      | select([.value.multi_select.options[].name] | index($t)) | .key) // ""')"
 
-QUERY="$(jq -n --arg p "$TITLE_PROP" --arg t "$TITLE" \
-  '{filter: {property: $p, title: {equals: $t}}, page_size: 1}')"
+QUERY="$(jq -n --arg p "$DATE_PROP" --arg d "$DAY" \
+  '{filter: {property: $p, date: {equals: $d}}, page_size: 1}')"
 FOUND="$(check "$(notion POST "/data_sources/$DS_ID/query" "$QUERY")" "既存ページの検索")"
 if [ "$(printf '%s' "$FOUND" | jq '.results | length')" != "0" ]; then
-  echo "同じタイトルのページが既にあります: $TITLE" >&2
+  echo "$DAY のページが既にあります" >&2
   printf '%s' "$FOUND" | jq -r '.results[0].url'
   exit 3
 fi
 
 BODY="$(jq -n \
   --arg ds "$DS_ID" \
-  --arg prop "$TITLE_PROP" \
-  --arg title "$TITLE" \
+  --arg title_prop "$TITLE_PROP" \
+  --arg date_prop "$DATE_PROP" \
+  --arg topic "$TOPIC" \
+  --arg day "$DAY" \
   --arg tag "$TAG" \
-  --argjson has_tag "$HAS_TAG_PROP" \
+  --arg tag_prop "$TAG_PROP" \
+  --arg icon "$ICON" \
   --rawfile md "$FILE" \
   '{parent: {type: "data_source_id", data_source_id: $ds},
-    properties: ({($prop): {title: [{text: {content: $title}}]}}
-                 + (if $has_tag > 0 then {"タグ": {multi_select: [{name: $tag}]}} else {} end)),
+    icon: {type: "emoji", emoji: $icon},
+    properties: ({($title_prop): {title: [{text: {content: $topic}}]},
+                  ($date_prop): {date: {start: $day}}}
+                 + (if $tag_prop == "" then {} else {($tag_prop): {multi_select: [{name: $tag}]}} end)),
     markdown: $md}')"
 
 if [ "$DRY_RUN" = "1" ]; then
