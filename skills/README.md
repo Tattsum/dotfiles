@@ -66,10 +66,10 @@ skills/
     │   ├── HTML-REPORT.md
     │   ├── DEEPENING.md
     │   └── INTERFACE-DESIGN.md
-    └── devin-task-triage/SKILL.md              # 開発タスクを Devin 送り / ここで処理 に振り分け
+    ├── devin-task-triage/SKILL.md              # 開発タスクを Devin 送り / ここで処理 に振り分け
+    ├── prompt-pattern-scan/SKILL.md            # プロンプト履歴から繰り返し作業を抽出しスキル化候補を出す
+    └── dotfiles-nippo/SKILL.md                 # セッションログから日報を生成（内省は書かず問いだけ残す）
 ```
-
-> `prompt-pattern-scan` は `~/.claude/skills/` 直下のみで運用しており、この `src/` 管理対象外。
 
 ## コマンド
 

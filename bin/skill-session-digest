@@ -1,0 +1,212 @@
+#!/usr/bin/env bash
+
+# Claude Code のセッションログ（~/.claude/projects/**/*.jsonl）から、指定日の作業を
+# 日報生成用の軽量 JSON に落とす。dotfiles-nippo skill の入力。
+#
+# 判断（要約・分類・評価・良し悪し）は持ち込まない。事実を集めて圧縮するだけ。
+# bin/skill-resolve-diff / bin/skill-review-state と同じ責務分割で、散文で同じ手順を
+# 書くとドリフトするのを防ぐために決定的処理をここに閉じ込める。
+#
+# 圧縮しない選択は取れない。実測（2026-08-20）で 1 日分の生データは prompt 141 件
+# 567KB ＋ tool_use 1,194 件 335KB あり、そのままモデルに渡すとコンテキストに乗らない。
+# prompt を 1000 字で切り詰め、tool_use をプロジェクト単位に集約して約 40KB にする。
+#
+# mtime での事前フィルタはしない。全 1,205 ファイル 478MB を舐めても実測 3 秒台で、
+# プレフィルタ有無の差は 2.4 秒しかない。corpus は保持期間（実測約 32 日）で頭打ちに
+# なるため、将来も増え続けない。
+#
+# `awk 1` を挟むのは末尾改行の無いファイル対策。複数ファイルを 1 つの jq プロセスに
+# 渡すと、末尾改行が無いファイルの最終行と次ファイルの先頭行が連結して 1 レコード
+# 消える（実測で再現済み・現状 0/1205 だが潜在）。`fromjson?` は壊れた行のスキップ用で、
+# これが無いと 1 行の破損で jq が exit 1 し、残り全ファイルがサイレントに欠落する。
+#
+# agent-*.jsonl（サブエージェントの記録）は除外する。日報の主語は人間の作業であり、
+# サブエージェント内部のツール実行まで数えると tool_frequency が実態から乖離する。
+#
+# Usage:
+#   skill-session-digest [YYYY-MM-DD] [--project <部分一致>] [--root <dir>]
+#
+#   --project は出力に現れるプロジェクトパス（git トップレベルに畳んだ後）への部分一致。
+#
+# Output: stdout に JSON 1 オブジェクト
+#   meta      date / timezone / source / files_scanned / retention_oldest
+#   stats     prompts_total（ノイズ除去前）/ prompts_kept / projects / sessions
+#             / tool_calls / by_hour / tools
+#   projects[] cwd, name, branches[], sessions[]{id,title}, span{from,to},
+#              tools{}, git_commands[], files_touched[], prompts[]{time,text}
+#
+# 出力にはリポジトリ名・ブランチ名・プロンプト本文がそのまま含まれる。business 文脈では
+# 顧客名・案件名を含むため、リポジトリ内に書き出さないこと（呼び出し側の責務）。
+
+set -euo pipefail
+
+ROOT="$HOME/.claude/projects"
+DAY=""
+PROJECT=""
+MAX_PROMPT_CHARS=1000
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --project) PROJECT="${2:-}"; shift 2 ;;
+    --root) ROOT="${2:-}"; shift 2 ;;
+    -h|--help) awk 'NR > 1 { if (/^#/) { sub(/^# ?/, ""); print; seen = 1 } else if (seen) exit }' "$0"
+               exit 0 ;;
+    -*) echo "unknown option: $1" >&2; exit 2 ;;
+    *) DAY="$1"; shift ;;
+  esac
+done
+
+[ -n "$DAY" ] || DAY="$(date +%Y-%m-%d)"
+case "$DAY" in
+  [0-9][0-9][0-9][0-9]-[0-9][0-9]-[0-9][0-9]) ;;
+  *) echo "date must be YYYY-MM-DD: $DAY" >&2; exit 2 ;;
+esac
+
+[ -d "$ROOT" ] || { echo "session log root not found: $ROOT" >&2; exit 1; }
+
+# jq の strftime は UTC 固定。ローカル日付で切るためにオフセット秒を渡して足す。
+TZ_NAME="$(date +%Z)"
+TZ_OFFSET="$(date +%z)"
+OFFSET_SECONDS=$(( ${TZ_OFFSET:0:1}1 * ( 10#${TZ_OFFSET:1:2} * 3600 + 10#${TZ_OFFSET:3:2} * 60 ) ))
+
+FILES_SCANNED="$(find "$ROOT" -type f -name '*.jsonl' ! -name 'agent-*' | wc -l | tr -d ' ')"
+OLDEST="$(find "$ROOT" -type f -name '*.jsonl' ! -name 'agent-*' -exec stat -f '%m' {} + 2>/dev/null \
+  | sort -n | head -1 | xargs -I{} date -r {} +%Y-%m-%d 2>/dev/null || true)"
+
+# nippo（nwiizo/nippo, MIT）の NOISE_PREFIXES を vendoring。ロジックは前方一致で自明だが、
+# リストそのものが 5 ヶ月分の観測の蓄積で、自作の素朴な版より 27% 多くノイズを落とす（実測）。
+# `[Image:` だけ上流の `[Image: source:` から広げてある。実測ログには
+# `[Image: original 3600x2338, ...` という別形式があり、上流の前方一致では素通りする。
+NOISE_PREFIXES='[
+  "<command-name>", "<command-message>", "<command-args>",
+  "<task-notification>", "<local-command-caveat>", "<local-command-stdout>",
+  "<bash-input>", "<bash-stdout>",
+  "[Image #", "[Image:", "[Request interrupted by user]",
+  "This session is being continued from a previous conversation",
+  "Base directory for this skill:", "(Re-invocation of /"
+]'
+
+EXTRACT='
+def localpart($fmt): (.[0:19] + "Z" | fromdateiso8601 + $off | strftime($fmt));
+
+select(type == "object")
+| if .type == "ai-title" then
+    { k: "a", sid: (.sessionId // ""), title: (.aiTitle // "") }
+  elif (.timestamp | type) != "string" then empty
+  elif (.timestamp | localpart("%Y-%m-%d")) != $day then empty
+  elif .type == "user" and (.isSidechain != true) and (.userType == "external") then
+    ( if (.message.content | type) == "string" then .message.content
+      else [ .message.content[]? | select(.type == "text") | .text // "" ] | join("\n")
+      end ) as $text
+    | if ($text | type) == "string" and ($text | length) > 0 then
+        { k: "p", time: (.timestamp | localpart("%H:%M")),
+          hour: (.timestamp | localpart("%H")),
+          cwd: (.cwd // ""), br: (.gitBranch // ""), sid: (.sessionId // ""),
+          text: $text }
+      else empty end
+  elif .type == "assistant" then
+    { cwd: (.cwd // ""), sid: (.sessionId // ""),
+      time: (.timestamp | localpart("%H:%M")) } as $ctx
+    | .message.content[]? | select(.type == "tool_use")
+    | $ctx + { k: "t", name: (.name // "?"),
+               arg: (.input.command // .input.file_path // .input.skill // .input.pattern // "") }
+  else empty end
+'
+
+AGGREGATE='
+# cwd をそのままプロジェクトにすると、リポジトリ内でディレクトリを移動しただけで
+# 別プロジェクトが生える（実測では 1 つのリポジトリが terraform / environments /
+# staging / production など 7 個に分裂した）。git のトップレベルに寄せて畳む。
+map(if (.cwd | type) == "string" then .cwd = ($roots[.cwd] // .cwd) else . end)
+# --project は畳んだ後のパスに掛ける。出力に出るプロジェクト名でそのまま絞れないと、
+# ユーザーが見えている名前（例: dev-local-scripts）で 0 件になる。
+| map(select(.k == "a" or $project == "" or ((.cwd // "") | contains($project))))
+| def home_short: sub("^" + $home; "~");
+# 一時ディレクトリは「プロジェクト」でも「触ったファイル」でもない。scratchpad は
+# セッション毎に切られるため、除外しないと日報に毎日ちがう偽プロジェクトが並ぶ。
+def is_ephemeral:
+  startswith("/tmp/") or startswith("/private/tmp/")
+  or startswith("/var/folders/") or startswith("/private/var/folders/")
+  or (contains("/scratchpad"));
+def trunc($n): if (. | length) > $n then (.[0:$n] + " …[truncated]") else . end;
+def trimmed: sub("^[\\s\\u3000]+"; "") | sub("[\\s\\u3000]+$"; "");
+def is_noise:
+  . as $t
+  | ($t | length) == 0
+    or ([ $noise[] | select(. as $prefix | $t | startswith($prefix)) ] | length) > 0
+    or ( ($t | sub("[.,!?。、！？\\s]+$"; "") | ascii_downcase)
+         | . == "y" or . == "yes" or . == "ok" or . == "okay" or . == "done" or . == "はい" );
+
+( [ .[] | select(.k == "a") ] | map({ (.sid): .title }) | add // {} ) as $titles
+| [ .[] | select(.k == "t") ] as $tools
+| [ .[] | select(.k == "p") | .text |= trimmed ] as $raw_prompts
+| ( [ $raw_prompts[] | select((.text | is_noise) | not) | .text |= trunc($chars) ]
+    | unique_by([.cwd, .time, .text]) ) as $prompts
+| ( [ $prompts[].cwd, $tools[].cwd ] | map(select(is_ephemeral | not)) | unique ) as $cwds
+| {
+    meta: {
+      date: $day,
+      timezone: $tz,
+      source: ($root | home_short),
+      files_scanned: $files,
+      retention_oldest: $oldest,
+      prompt_truncated_at: $chars
+    },
+    stats: {
+      prompts_total: ($raw_prompts | length),
+      prompts_kept: ($prompts | length),
+      projects: ($cwds | length),
+      sessions: ([ $prompts[].sid ] | unique | length),
+      tool_calls: ($tools | length),
+      by_hour: ( [ $prompts[].hour ] | group_by(.) | map({ key: .[0], value: length }) | from_entries ),
+      tools: ( [ $tools[].name ] | group_by(.) | map({ key: .[0], value: length })
+               | sort_by(-.value) | from_entries )
+    },
+    projects: [
+      $cwds[] as $cwd
+      | ( [ $prompts[] | select(.cwd == $cwd) ] ) as $ps
+      | ( [ $tools[] | select(.cwd == $cwd) ] ) as $ts
+      | {
+          cwd: ($cwd | home_short),
+          name: ($cwd | split("/") | last),
+          branches: ( [ $ps[].br ] | map(select(. != "")) | unique ),
+          sessions: ( [ $ps[].sid, $ts[].sid ] | unique
+                      | map({ id: .[0:8], title: ($titles[.] // "") }) ),
+          span: { from: ( [ $ps[].time, $ts[].time ] | min ),
+                  to:   ( [ $ps[].time, $ts[].time ] | max ) },
+          tools: ( [ $ts[].name ] | group_by(.) | map({ key: .[0], value: length })
+                   | sort_by(-.value) | from_entries ),
+          git_commands: ( [ $ts[] | select(.name == "Bash" and (.arg | startswith("git ")))
+                            | .arg | gsub("\\s+"; " ") | trunc(200) ] | unique | .[0:40] ),
+          files_touched: ( [ $ts[] | select(.name == "Edit" or .name == "Write" or .name == "NotebookEdit")
+                             | .arg | select(. != "" and (is_ephemeral | not)) | home_short ]
+                           | unique | .[0:30] ),
+          # セッションを再開すると過去のやり取りが新しいファイルにも書き戻され、同一発話が
+          # 複数ファイルに現れる（実測で同じ prompt が 2 回計上された）。時刻＋本文で潰す。
+          prompts: ( [ $ps[] | { time, text } ] | sort_by(.time) )
+        }
+      | select((.prompts | length) > 0 or (.tools | length) > 0)
+    ] | sort_by(- (.prompts | length))
+  }
+'
+
+RECORDS="$(mktemp -t skill-session-digest)"
+trap 'rm -f "$RECORDS"' EXIT
+
+find "$ROOT" -type f -name '*.jsonl' ! -name 'agent-*' -print0 \
+  | xargs -0 awk 1 \
+  | jq -c -R --argjson off "$OFFSET_SECONDS" --arg day "$DAY" \
+        'fromjson? // empty | '"$EXTRACT" > "$RECORDS"
+
+# cwd → git トップレベルの対応表。作業ツリーが消えている cwd は自分自身に落とす。
+CWD_ROOTS="$(jq -r '.cwd // empty' "$RECORDS" | sort -u \
+  | while IFS= read -r dir; do
+      printf '%s\t%s\n' "$dir" "$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || echo "$dir")"
+    done \
+  | jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | { (.[0]): .[1] }) | add // {}')"
+
+jq -s --arg day "$DAY" --arg tz "$TZ_NAME" --arg root "$ROOT" --arg home "$HOME" \
+      --arg oldest "${OLDEST:-unknown}" --argjson files "$FILES_SCANNED" \
+      --argjson chars "$MAX_PROMPT_CHARS" --argjson noise "$NOISE_PREFIXES" \
+      --argjson roots "$CWD_ROOTS" --arg project "$PROJECT" \
+      "$AGGREGATE" "$RECORDS"
