@@ -105,6 +105,23 @@ link_file "$DOTFILES_DIR/bin/skill-review-state" "$HOME/.local/bin/skill-review-
 
 echo ""
 echo "------------------------------"
+echo "🕒 launchd ジョブのスクリプトをリンクします..."
+echo "------------------------------"
+link_file "$DOTFILES_DIR/bin/brew-maintenance" "$HOME/.local/bin/brew-maintenance"
+link_file "$DOTFILES_DIR/bin/install-launchagent" "$HOME/.local/bin/install-launchagent"
+
+echo ""
+echo "------------------------------"
+echo "📊 prompt-pattern-scan の解析バッチをリンクします..."
+echo "------------------------------"
+# state.json / report-latest.md / classification-rules.json は history.jsonl の派生物で
+# 社内固有名を含むため repo に置かない。ここでリンクするのはロジック側だけ。
+link_file "$DOTFILES_DIR/claude/prompt-patterns/ANALYSIS_PROMPT.md" "$HOME/.claude/prompt-patterns/ANALYSIS_PROMPT.md"
+link_file "$DOTFILES_DIR/claude/prompt-patterns/run-analysis.sh" "$HOME/.claude/prompt-patterns/run-analysis.sh"
+link_file "$DOTFILES_DIR/claude/prompt-patterns/README.md" "$HOME/.claude/prompt-patterns/README.md"
+
+echo ""
+echo "------------------------------"
 echo "⭐ starship の設定をリンクします..."
 echo "------------------------------"
 link_file "$DOTFILES_DIR/starship/starship.toml" "$HOME/.config/starship.toml"
@@ -152,10 +169,27 @@ echo "------------------------------"
 echo "🍺 Homebrew パッケージ（Brewfile）を適用します..."
 echo "------------------------------"
 if command -v brew >/dev/null 2>&1; then
+  # bundle install は未導入を入れるだけでなく outdated な cask も更新する。bin/brew-maintenance と
+  # 同じ抑制を効かせないと、セットアップのたびに起動中の Docker Desktop やエディタが落とされ、
+  # 自己更新するアプリを brew が二重に上書きする。
+  export HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS=1
+  export HOMEBREW_NO_UPGRADE_QUIT_CASKS=1
+
   # 冪等。インストール済みは skip され、未導入の formula/cask/tap のみ入る。
   brew bundle install --file="$DOTFILES_DIR/brew/Brewfile"
 else
   echo "  ⏭ brew が見つからないためスキップ（https://brew.sh からインストール後に再実行）"
+fi
+
+echo ""
+echo "------------------------------"
+echo "🕒 launchd ジョブを登録します..."
+echo "------------------------------"
+# 失敗を許容する。bootstrap は disable 済み・二重ロードのいずれでも exit 5 を返し、
+# set -e 下でそのまま呼ぶとこのセットアップ全体が落ちる。
+if ! "$DOTFILES_DIR/bin/install-launchagent"; then
+  echo "  ⚠️ launchd ジョブの登録に失敗しました。上のメッセージを確認して"
+  echo "     install-launchagent を単独で再実行してください（他の設定は適用済みです）"
 fi
 
 echo ""

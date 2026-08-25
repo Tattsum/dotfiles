@@ -1,8 +1,8 @@
-tap "budougumi0617/tap"
-tap "bufbuild/buf"
-tap "filosottile/musl-cross"
-tap "go-delve/delve"
-tap "go-task/tap"
+tap "budougumi0617/tap", trusted: true
+tap "bufbuild/buf", trusted: true
+tap "filosottile/musl-cross", trusted: true
+tap "go-delve/delve", trusted: true
+tap "go-task/tap", trusted: true
 # Run your GitHub Actions locally
 brew "act"
 # Simple, modern, secure file encryption
@@ -19,16 +19,20 @@ brew "awscli"
 brew "libgit2"
 # Clone of cat(1) with syntax highlighting and Git integration
 brew "bat"
+# Incredibly fast JavaScript runtime, bundler, test runner, and package manager
+brew "bun"
 # XML-based font configuration API for X Windows
 brew "fontconfig"
 # Core application library for C
 brew "glib"
 # Decentralized dependency manager for Cocoa
 brew "carthage"
-# Enables you to reproduce the CircleCI environment locally
+# Official command-line tool for CircleCI
 brew "circleci"
 # Utility for connecting securely to your Cloud SQL instances
 brew "cloud-sql-proxy"
+# Cloudflare Tunnel client (formerly Argo Tunnel)
+brew "cloudflared"
 # Load/unload environment variables based on $PWD
 brew "direnv"
 # Pack, ship and run any application as a lightweight container
@@ -41,6 +45,8 @@ brew "dpkg"
 brew "dust"
 # Simple, fast and user-friendly alternative to find
 brew "fd"
+# Command-line tools for fly.io services
+brew "flyctl"
 # Command-line fuzzy finder written in Go
 brew "fzf"
 # Interact with Google Gemini AI models from the command-line
@@ -59,6 +65,8 @@ brew "gitui"
 brew "go"
 # Go implementation of configuration language for defining JSON data
 brew "go-jsonnet"
+# Task is a task runner/build tool that aims to be simpler and easier to use
+brew "go-task"
 # Database migrations CLI tool
 brew "golang-migrate"
 # GNU grep, egrep and fgrep
@@ -123,6 +131,8 @@ brew "pyenv"
 brew "python@3.12"
 # Ruby version manager
 brew "rbenv"
+# Rsync for cloud storage
+brew "rclone"
 # Persistent key-value database, with built-in net interface
 brew "redis"
 # Search tool like grep and The Silver Searcher
@@ -139,6 +149,8 @@ brew "shellcheck"
 brew "sops"
 # Cross-shell prompt for astronauts
 brew "starship"
+# CI-Friendly tool to document a database
+brew "tbls"
 # User interface to the TELNET protocol
 brew "telnet"
 # OCR (Optical Character Recognition) engine
@@ -171,6 +183,12 @@ brew "zellij"
 brew "zoxide"
 # UNIX shell (command interpreter)
 brew "zsh"
+# Insert function segments into any function/method for Newrelic APM.
+brew "budougumi0617/tap/nrseg"
+# The best way of working with Protocol Buffers.
+brew "bufbuild/buf/buf"
+# Linux cross compilers based on musl libc
+brew "filosottile/musl-cross/musl-cross"
 # Command-line interface for 1Password
 cask "1password-cli"
 # OpenAI's official ChatGPT desktop app
@@ -300,12 +318,14 @@ go "github.com/go-delve/delve/cmd/dlv"
 go "github.com/766b/go-outliner"
 go "mvdan.cc/gofumpt"
 go "github.com/golangci/golangci-lint/v2/cmd/golangci-lint"
+go "github.com/pressly/goose/v3/cmd/goose"
 go "github.com/haya14busa/goplay/cmd/goplay"
 go "golang.org/x/tools/gopls"
 go "github.com/cweill/gotests/gotests"
 go "github.com/99designs/gqlgen"
 go "github.com/josharian/impl"
 go "github.com/evilmartians/lefthook/v2"
+go "go.uber.org/nilaway/cmd/nilaway"
 go "connectrpc.com/connect/cmd/protoc-gen-connect-go"
 go "google.golang.org/protobuf/cmd/protoc-gen-go"
 go "google.golang.org/grpc/cmd/protoc-gen-go-grpc"

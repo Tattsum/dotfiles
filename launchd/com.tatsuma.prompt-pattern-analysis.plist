@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
+<plist version="1.0">
+<dict>
+    <key>Label</key>
+    <string>com.tatsuma.prompt-pattern-analysis</string>
+
+    <!-- plist は $HOME や ~ を展開せず、誤ったパスを書いても無言で失敗する。zsh を挟んで
+         シェルに展開させることで、ユーザー名のハードコードを避けている（この repo は public）。 -->
+    <key>ProgramArguments</key>
+    <array>
+        <string>/bin/zsh</string>
+        <string>-c</string>
+        <string>exec "$HOME/.claude/prompt-patterns/run-analysis.sh"</string>
+    </array>
+
+    <!-- 毎日 11:00 と 19:00 に起動。スリープでミスした分は復帰後に launchd が遅延実行する -->
+    <key>StartCalendarInterval</key>
+    <array>
+        <dict>
+            <key>Hour</key>
+            <integer>11</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+        <dict>
+            <key>Hour</key>
+            <integer>19</integer>
+            <key>Minute</key>
+            <integer>0</integer>
+        </dict>
+    </array>
+
+    <!-- 起動のたびに走るだけでよいので RunAtLoad は付けない -->
+    <!-- StandardOutPath / StandardErrorPath は指定しない。run-analysis.sh が自前で run.log へ
+         リダイレクトしており、旧 plist が指していた launchd.*.log は 0 バイトのままだった。 -->
+</dict>
+</plist>

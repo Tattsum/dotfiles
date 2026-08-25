@@ -55,11 +55,68 @@ zellij をベースにしたターミナル IDE 環境を管理しています�
   ```sh
   brew bundle dump --force --file=brew/Brewfile
   ```
+  `dump` は `installed_on_request` なもの（自分で明示 install したもの）を拾います。検証用に一時的に
+  入れたものも残るため、**commit 前に `git diff` を必ずレビューする**こと。`tap` 行には `trusted: true`
+  が付くので、サードパーティ tap の信頼宣言をリポジトリに焼き込む点も意識して承認します。
 - 不要になったパッケージを Brewfile に揃えて削除したい場合（Brewfile に無いものをアンインストール）:
   ```sh
-  brew bundle cleanup --file=brew/Brewfile        # 削除対象の確認
+  brew bundle cleanup --file=brew/Brewfile        # 削除対象の確認（既定は dry-run）
   brew bundle cleanup --force --file=brew/Brewfile  # 実行
   ```
+  **自動化しないこと。** Brewfile は削除判断の根拠にできる精度ではなく、依存として入っただけの
+  ものまで削除対象に挙がります。
+- 充足チェックには `--no-upgrade` を付けます。既定の `brew bundle check` は outdated も未充足として
+  扱うため、ChatGPT のようにアプリ自身が更新する cask があると**恒久的に失敗**します:
+  ```sh
+  brew bundle check --no-upgrade --file=brew/Brewfile
+  ```
+  なお `check` は Brewfile 記載物の導入有無しか見ません。**実機にあって Brewfile に無いもの（余剰）は
+  検出できない**ので、ドリフト確認は `dump` して `git diff` を見る手順で行います。
+
+## launchd の定期ジョブ
+
+`launchd/` 配下の plist を `~/Library/LaunchAgents/` へ配置し、`bin/install-launchagent` で登録します。
+`install.sh` からも最後に呼ばれますが、失敗しても他の設定適用は巻き添えにしません。
+
+| ラベル | 内容 | スケジュール |
+|---|---|---|
+| `com.tatsuma.kano.brew-maintenance` | `brew update` → `upgrade` → `cleanup`（`bin/brew-maintenance`） | 毎日 10:30 |
+| `com.tatsuma.prompt-pattern-analysis` | プロンプト履歴のパターン抽出（`claude/prompt-patterns/run-analysis.sh`） | 毎日 11:00 / 19:00 |
+
+```sh
+./bin/install-launchagent                                    # 全 plist を登録し直す
+./bin/install-launchagent com.tatsuma.kano.brew-maintenance  # ラベル指定
+launchctl kickstart -k gui/$(id -u)/<label>                  # 即時実行
+launchctl print gui/$(id -u)/<label>                         # 状態確認
+launchctl bootout gui/$(id -u)/<label>                       # 停止
+```
+
+運用上の注意:
+
+- plist は **symlink ではなく実体をコピー**します。launchd は bootstrap 時に内容をキャッシュするため、
+  リンク先を編集しても反映されません。**plist を編集したら必ず `install-launchagent` を叩き直す**こと。
+- plist は `$HOME` や `~` を展開しません（誤ったパスを書いても無言で失敗します）。パスは `/bin/zsh -c`
+  経由でシェルに展開させ、ログの宛先はスクリプト側のリダイレクトに寄せています。
+- `launchctl enable` は自動実行しません。システム設定 → ログイン項目でジョブを意図的にオフにした場合、
+  `install.sh` の再実行で黙って再有効化されるのを避けるためです。過去に無効化していて `bootstrap` が
+  失敗する場合のみ、案内に従って手動で `launchctl enable` してください。
+- brew のジョブは**実行中のアプリを終了させません**（`HOMEBREW_NO_UPGRADE_QUIT_CASKS`）。また
+  自己更新する cask には触れません（`HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS`）。
+- ログは `~/Library/Logs/brew-maintenance.log`。スクリプトが追記の前に直近 30 実行分へ切り詰めます
+  （`KEEP_RUNS` 環境変数で変更可）。旧形式のログは `brew-maintenance.log.legacy` に退避してあります。
+
+## プロンプトパターン解析（prompt-pattern-scan）
+
+`~/.claude/history.jsonl` から繰り返し作業パターンを抽出し、スキル化候補をレポートする仕組みです。
+
+- `skills/src/prompt-pattern-scan/SKILL.md` — 手動起動用の skill
+- `claude/prompt-patterns/ANALYSIS_PROMPT.md` — 解析ロジック本体（skill と日次バッチが共有）
+- `claude/prompt-patterns/run-analysis.sh` — 日次バッチのランナー
+- `launchd/com.tatsuma.prompt-pattern-analysis.plist` — スケジュール定義
+
+**生成物はこのリポジトリで管理しません。** `state.json` / `report-latest.md` /
+`classification-rules.json` は履歴の派生物で固有名詞を含み得るため、`~/.claude/prompt-patterns/` に
+置いたまま `.gitignore` で除外しています（このリポジトリは public です）。
 
 ## Cursor / Skills（汎用テンプレ）
 

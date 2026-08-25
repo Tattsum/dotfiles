@@ -1,0 +1,73 @@
+#!/usr/bin/env bash
+#
+# Homebrew の定期メンテナンス。launchd（com.tatsuma.kano.brew-maintenance）から毎日 10:30 に起動される。
+#
+# Usage: brew-maintenance
+#   KEEP_RUNS=<n>  保持する実行数（既定 30）
+# 出力: ~/Library/Logs/brew-maintenance.log
+#   追記の前に直近 KEEP_RUNS 実行分へ切り詰めるため、ファイル内は最大 KEEP_RUNS+1 実行分になる
+
+# set -e は使わない。brew update がネットワーク障害で落ちたときに upgrade / cleanup ごと
+# スキップされると、ディスクを食ったまま気づけない。各コマンドの失敗は記録して続行する。
+set -uo pipefail
+
+# launchd は最小 PATH でジョブを起動するため、brew を明示的に通す
+export PATH="/opt/homebrew/bin:/usr/local/bin:$PATH"
+
+LOG="$HOME/Library/Logs/brew-maintenance.log"
+KEEP_RUNS="${KEEP_RUNS:-30}"
+RUN_MARKER='^===== run start:'
+
+# 自己更新するアプリ（Cursor / Docker Desktop / Zed 等）は brew に触らせない。二重管理になり、
+# ChatGPT 1本で 605MB の再ダウンロードが毎日発生していた。
+# 注意: man brew に "Does not affect --greedy" とあり、--greedy を付けるとこの指定は無効化される。
+export HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS=1
+
+# cask の更新は既定で実行中アプリを強制終了させる。10:30 は業務時間内で、Docker Desktop の
+# 停止やエディタの未保存状態の消失を招く。起動中のアプリはスキップさせ、次の機会に回す。
+export HOMEBREW_NO_UPGRADE_QUIT_CASKS=1
+
+rotate_log() {
+  [ -f "$LOG" ] || return 0
+
+  local total
+  total="$(grep -c "$RUN_MARKER" "$LOG" 2>/dev/null || echo 0)"
+  [ "$total" -gt "$KEEP_RUNS" ] || return 0
+
+  local start_line
+  start_line="$(grep -n "$RUN_MARKER" "$LOG" | tail -n "$KEEP_RUNS" | head -n 1 | cut -d: -f1)"
+  [ -n "$start_line" ] || return 0
+
+  # 同一ファイルへの in-place リダイレクトは読む前に truncate されるため、必ず別ファイル経由で置換する
+  local tmp="$LOG.rotating"
+  if tail -n "+$start_line" "$LOG" >"$tmp" 2>/dev/null; then
+    mv "$tmp" "$LOG" || echo "!!!!! rotate_log: $LOG の置換に失敗"
+  else
+    rm -f "$tmp"
+    echo "!!!!! rotate_log: $LOG の切り詰めに失敗（このまま追記を続けます）"
+  fi
+}
+
+mkdir -p "$(dirname "$LOG")"
+
+# ローテートは exec の前に行う。後に回すと mv で inode が差し替わり、開いたままの fd への
+# 書き込み（＝この回の出力）が宛先を失う。代わりに診断だけ退避し、リダイレクト確立後に出す。
+rotate_msg="$(rotate_log 2>&1)"
+exec >>"$LOG" 2>&1
+[ -n "$rotate_msg" ] && echo "$rotate_msg"
+
+echo "===== run start: $(date '+%Y-%m-%d %H:%M:%S') ====="
+
+failed=0
+for step in "update" "upgrade" "cleanup"; do
+  # if ! brew "$step" だと then 節の $? が否定後の 0 になり、終了コードを記録できない
+  brew "$step"
+  status=$?
+  if [ "$status" -ne 0 ]; then
+    echo "!!!!! FAILED: brew $step (exit=$status)"
+    failed=1
+  fi
+done
+
+echo "===== run end:   $(date '+%Y-%m-%d %H:%M:%S') (failed=$failed) ====="
+exit "$failed"
