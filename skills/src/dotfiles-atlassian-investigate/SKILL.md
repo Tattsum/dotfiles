@@ -196,7 +196,7 @@ git worktree list   # 別 worktree を指定された場合
 
 ## 委譲境界
 
-- **チケットの内容に基づいて実装する**: `dotfiles-plan-first`（設計判断を伴う場合）→ 実装 → `dotfiles-commit-push`。このスキルは調査と草案までで、コードを編集しない。
+- **チケットの内容に基づいて実装する**: `dotfiles-plan-first`（設計判断を伴う場合）→ 実装 → `dotfiles-commit-push`。このスキルは調査と草案までで、コードを編集しない。**実装意図の動詞を伴う課題起点（「この課題の対応を進めて」「実装して」）は `dotfiles-plan-first` が入口**、読み取り・確認・回答草案（「このチケット見て」「どう返せばいい？」）がこのスキル。同じ URL でも**求められている終端が違う**ので使い分ける。
 - **PR のレビュー**: `dotfiles-review-and-act`（PR 起点で Jira/Confluence を引いて仕様適合を照合する。**起点が逆**なので使い分ける）。
 - **commit / push**: `dotfiles-commit-push`。
 - **Atlassian への投稿・編集**: このスキルの責務外。人間が行う。
