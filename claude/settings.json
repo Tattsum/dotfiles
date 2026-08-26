@@ -20,5 +20,38 @@
     "claude-code-setup@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true
   },
-  "advisorModel": "opus"
+  "advisorModel": "opus",
+  "autoMode": {
+    "environment": [
+      "### Org-wide",
+      "**Organization**: None configured",
+      "**Cloud provider(s)**: None configured",
+      "**Repository visibility**: PUBLIC — github.com:Tattsum/dotfiles (any push here is publishing; treat all content as world-readable)",
+      "**Internal sharing / snippet hosting**: None configured — treat public paste/gist services as outside the trust boundary",
+      "**Secrets management**: None configured",
+      "**Default / protected branches**: default branch `main`; no rulesets and no classic protected branches listed via gh for Tattsum/dotfiles",
+      "**CI/CD deploy targets**: None configured",
+      "**Network posture**: None configured",
+      "**Source control**: The trusted repo and its remote(s) only (no additional orgs configured) — github.com:Tattsum/dotfiles, a PUBLIC repo",
+      "**Trusted internal domains**: None configured",
+      "**Trusted cloud buckets**: None configured",
+      "**Key internal services**: None configured",
+      "**Internal package registry**: None configured",
+      "**Sensitive data locations & audiences**: any file or store holding personal data, confidential business data, credentials, regulated data, or similarly sensitive material; preserve exact handles when known and share only with audiences cleared at the [named+specifics] bar. Note this is a dotfiles repo that is PUBLIC: local shell/tool config under ~ may contain tokens or host names that must never be committed here.",
+      "**Data retention / declassification**: None configured",
+      "**Sensitive remote targets**: any namespace, host, or container whose name carries `prod` or `production` as a whole word or name segment (hyphen/underscore/dot-delimited — e.g. matches `prod-db`, not `producer`)",
+      "**Protected deployment namespaces / environments**: None configured — fall back to the Sensitive remote targets heuristic",
+      "**Protected IaC scopes**: IAM, RBAC, networking, quota, and node-pool resources; anything whose name or tag carries `prod` or `production` as a whole word or name segment",
+      "### User-specific",
+      "**Primary use of Claude Code**: software development — maintaining this dotfiles repo (zsh, helix, zellij, yazi configs, install.sh symlink management) plus code review workflows",
+      "**Trusted repo**: /Users/tatsuma.kano/.dotfiles and its remote github.com:Tattsum/dotfiles. Because that remote is PUBLIC, only this repo's own dotfiles work belongs there; content ported or first read from outside this session's repo does not. Secrets and personal data are never cleared into it by visibility.",
+      "**Org-specific CLIs**: None configured — observed local tooling is modern-CLI replacements (fd, bat, rg, sd, dust, procs, zoxide) and zellij/helix/yazi",
+      "**Routine actions**: local file reads and searches with `fd` and `bat` inside /Users/tatsuma.kano/.dotfiles; `install.sh` symlink runs into $HOME config paths"
+    ],
+    "allow": [
+      "$defaults",
+      "Bash(fd:*)",
+      "Bash(bat:*)"
+    ]
+  }
 }
