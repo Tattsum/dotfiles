@@ -53,5 +53,8 @@
       "Bash(fd:*)",
       "Bash(bat:*)"
     ]
+  },
+  "sandbox": {
+    "enabled": true
   }
 }
