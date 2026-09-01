@@ -354,8 +354,22 @@ extract_cursor() {
   add_source_stat "cursor" "$CURSOR_ROOT" "available" "$files" "$((after - before))" "session-or-file" "$oldest"
 }
 
+# 形式変更の検知に使う「その rollout が発話行を持つか」。日付で絞らないのは、日を跨いだ
+# セッション（前日に発話・当日はツールだけ）と text 要素を持たない発話（画像のみ）で
+# 誤発火するため（どちらも実測で再現）。日単位の件数では逆に、移行日に旧形式ファイルの
+# 当日発話が新形式ファイルの沈黙を隠して見逃す。発話行を 1 つも持たない rollout だけが
+# 形式変更の像なので、判定はファイル単位・日付非依存で行う。
+codex_prompt_lines() {
+  jq -s '[.[] | select(type == "object")
+               | select(.type == "event_msg")
+               | select(.payload.type == "user_message"
+                        or (.payload.type == "item_completed"
+                            and (.payload.item | type) == "object"
+                            and .payload.item.type == "UserMessage"))] | length' "$1"
+}
+
 extract_codex() {
-  local files before after oldest file
+  local files before after oldest file rows extracted counts mute_files
 
   [ -d "$CODEX_ROOT" ] || {
     add_warning "Codex log root not found: $(short_path "$CODEX_ROOT")"
@@ -366,15 +380,51 @@ extract_codex() {
   files="$(command find "$CODEX_ROOT" -type f -name 'rollout-*.jsonl' | wc -l | tr -d ' ')"
   oldest="$(oldest_file_date "$CODEX_ROOT" 'rollout-*.jsonl')"
   before="$(day_record_count)"
+  rows="$(mktemp -t skill-session-digest-codex-rows)"
+  extracted="$(mktemp -t skill-session-digest-codex-extracted)"
+  mute_files=0
 
+  # 新旧の rollout 形式を別関数に分けないのは、session_meta の親子判定・時刻・cwd の
+  # 扱いが両形式で完全に共通で、分けると同じ除外ロジックを二重に持つことになるため。
   while IFS= read -r -d '' file; do
-    awk 1 "$file" | jq -c -R 'fromjson? // empty' \
-      | jq -cs --argjson off "$OFFSET_SECONDS" --arg day "$DAY" '
+    awk 1 "$file" | jq -c -R 'fromjson? // empty' > "$rows"
+    jq -cs --argjson off "$OFFSET_SECONDS" --arg day "$DAY" '
           def localpart($value; $fmt): ($value[0:19] + "Z" | fromdateiso8601 + $off | strftime($fmt));
           def call_arg:
             if .payload.name == "exec_command" or .payload.name == "shell_command" then
               ((.payload.arguments | fromjson? | .cmd) // "")
             else "" end;
+          # 新形式の custom_tool_call は name が一律 "exec" で、実際の道具は input の
+          # JS 風ソース（`await tools.exec_command({...})`）の中にしか無い。
+          # input 全体を fromjson で読まないのは、実測で引数がクォート無しキーの
+          # オブジェクトリテラルで整形されている系統があり（`{\n  cmd: "…"\n}`）、
+          # JSON として解釈できないため。cmd の値だけを JSON 文字列リテラルとして
+          # 取り出せば、両系統ともエスケープ込みで復元できる（実測 69/69 件）。
+          #
+          # 道具名の走査前に文字列リテラルを落とすのは、apply_patch のパッチ本文が
+          # 呼び出しより前に置かれるため（実測 15/15 が
+          # `const patch = "…"; text(await tools.apply_patch(patch));`）。本文に
+          # `await tools.exec_command(` の文字列が入ると最初の一致がそちらになり、実際は
+          # 編集なのに Bash の幻レコードが出る。このスクリプト自身のコメントがその文字列を
+          # 含むので、自分を Codex で編集した時点で発火する。逆向き（cmd に
+          # `tools.apply_patch(` を含むシェル実行が select で丸ごと落ちて黙って欠ける）も
+          # 同じ根。呼び出し形まで要求するのは、strip 後も本文以外の言及が残りうるため。
+          # 実測 170/170 で strip 前の判定と一致し、いずれも呼び出し 1 件に収束する。
+          def inner_tool($input):
+            [$input | gsub("\"(?:[^\"\\\\]|\\\\.)*\""; "")
+                    | scan("tools\\.([A-Za-z_0-9]+)\\s*\\(")]
+            | first // []
+            | (if type == "array" then (.[0] // "") else . end);
+          def inner_cmd($input):
+            [$input | match("\\bcmd\\b\"?\\s*:\\s*(\"(?:[^\"\\\\]|\\\\.)*\")"; "g")
+                    | .captures[0].string]
+            | first // ""
+            | (fromjson? // "");
+          # item を直接索引しないのは、非オブジェクトで来たとき jq が索引エラーを投げ、
+          # 下の changes と同じく digest 全体が exit 5 で沈黙するため。片方だけ守ると
+          # 次に読む人がどちらが方針か判断できないので、item と changes で揃える。
+          def item_type:
+            if (.payload.item | type) == "object" then (.payload.item.type // "") else "" end;
           . as $rows
           | ([$rows[] | select(.type == "session_meta") | .payload] | first) as $meta
           | select($meta != null)
@@ -390,6 +440,27 @@ extract_codex() {
                   cwd: ($meta.cwd // ""), br: ($meta.git.branch // ""), sid: ($meta.id // ""),
                   text: (.payload.message // "")}
                  | select((.text | length) > 0)
+               elif .type == "event_msg" and .payload.type == "item_completed"
+                    and item_type == "UserMessage" then
+                 # response_item/message の role=user を使わないのは、AGENTS.md の
+                 # 注入や環境情報が同じ形で混ざり、人間の発話と区別できないため。
+                 ([.payload.item.content[]? | select(.type == "text") | .text // ""]
+                  | join("\n")) as $text
+                 | {k: "p", source: "codex", precision: "event",
+                    time: localpart(.timestamp; "%H:%M"), hour: localpart(.timestamp; "%H"),
+                    cwd: ($meta.cwd // ""), br: ($meta.git.branch // ""), sid: ($meta.id // ""),
+                    text: $text}
+                 | select((.text | length) > 0)
+               elif .type == "event_msg" and .payload.type == "item_completed"
+                    and item_type == "FileChange" then
+                 # 型を確かめてから keys を取るのは、changes が配列で来たとき jq の keys が
+                 # エラーではなく整数の添字を静かに返すため。arg が数値になり、離れた最終
+                 # jq の is_ephemeral で初めて落ちる（実測 exit 5・stdout 空・エラー文に
+                 # Codex も FileChange も出ない）。1 ソースの異常で全体を殺さない方針に反する。
+                 (.payload.item.changes // {} | select(type == "object") | keys[]) as $path
+                 | {k: "t", source: "codex", precision: "event",
+                    time: localpart(.timestamp; "%H:%M"), hour: localpart(.timestamp; "%H"),
+                    cwd: ($meta.cwd // ""), sid: ($meta.id // ""), name: "Edit", arg: $path}
                elif .type == "response_item" and .payload.type == "function_call" then
                  {k: "t", source: "codex", precision: "event",
                   time: localpart(.timestamp; "%H:%M"), hour: localpart(.timestamp; "%H"),
@@ -397,6 +468,23 @@ extract_codex() {
                   name: (if .payload.name == "exec_command" or .payload.name == "shell_command" then "Bash"
                          elif .payload.name == "apply_patch" then "Edit" else (.payload.name // "?") end),
                   arg: call_arg}
+               elif .type == "response_item" and .payload.type == "custom_tool_call"
+                    and .payload.name == "exec" then
+                 (.payload.input // "" | tostring) as $input
+                 | inner_tool($input) as $inner
+                 # apply_patch をここで数えないのは、同じ編集が item_completed の
+                 # FileChange に変更ファイル単位で出るため。両方数えると Edit が二重に
+                 # なる（実測: 親セッションで apply_patch 12 件・FileChange の変更パス
+                 # 22 件）。かわりにパッチ本文のヘッダから拾う手も採らない。1 パッチが
+                 # 複数ファイルを触るので先頭 1 件しか復元できず、files_touched が
+                 # 実測で 45〜79% 落ちる。
+                 | select($inner != "apply_patch")
+                 | {k: "t", source: "codex", precision: "event",
+                    time: localpart(.timestamp; "%H:%M"), hour: localpart(.timestamp; "%H"),
+                    cwd: ($meta.cwd // ""), sid: ($meta.id // ""),
+                    name: (if $inner == "exec_command" then "Bash"
+                           elif $inner == "" then "?" else $inner end),
+                    arg: (if $inner == "exec_command" then inner_cmd($input) else "" end)}
                elif .type == "response_item" and .payload.type == "custom_tool_call" then
                  (.payload.input // "") as $input
                  | {k: "t", source: "codex", precision: "event",
@@ -412,11 +500,29 @@ extract_codex() {
                   time: localpart(.timestamp; "%H:%M"), hour: localpart(.timestamp; "%H"),
                   cwd: ($meta.cwd // ""), sid: ($meta.id // ""), name: "web_search", arg: ""}
                else empty end)
-        ' >> "$RECORDS"
+        ' "$rows" > "$extracted"
+
+    # records が非 0 なら健全、とは見なせない。実測（2026-09-01）の新形式では
+    # function_call / custom_tool_call は旧形式のまま拾えるのに user_message だけが
+    # 別イベントへ移り、tool 61 件・prompt 0 件で通ってしまった。日報は発話が主語なので、
+    # この状態は「その日 Codex を使っていない」と同じ顔をしてはいけない。
+    counts="$(jq -s -r '[([.[] | select(.k == "t")] | length),
+                         ([.[] | select(.k == "p")] | length)] | join(" ")' "$extracted")"
+    if [ "${counts%% *}" -gt 0 ] && [ "${counts##* }" -eq 0 ] \
+       && [ "$(codex_prompt_lines "$rows")" -eq 0 ]; then
+      mute_files=$((mute_files + 1))
+    fi
+
+    command cat "$extracted" >> "$RECORDS"
   done < <(command find "$CODEX_ROOT" -type f -name 'rollout-*.jsonl' -print0)
 
+  rm -f "$rows" "$extracted"
   after="$(day_record_count)"
   add_source_stat "codex" "$CODEX_ROOT" "available" "$files" "$((after - before))" "event" "$oldest"
+
+  if [ "$mute_files" -gt 0 ]; then
+    add_warning "codex: $DAY のツール実行を記録した rollout $mute_files 件に発話行が 1 つも無い（形式変更の可能性）"
+  fi
 }
 
 selected "claude" && extract_claude
