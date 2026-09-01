@@ -159,6 +159,21 @@ touch -t 202608151200 "$CODEX_ROOT/2026/08/15/rollout-nometa.jsonl"
 quiet="$($DIGEST 2026-09-01 --source codex --codex-root "$CODEX_ROOT/2026/08")"
 jq -e '.stats.prompts_kept == 0 and .meta.warnings == []' <<< "$quiet" >/dev/null
 
+while IFS=' ' read -r stamp expected; do
+  touch -t "$stamp" "$CODEX_ROOT/2026/08/15/rollout-nometa.jsonl"
+  actual="$($DIGEST 2026-09-01 --source codex --codex-root "$CODEX_ROOT/2026/08" \
+    | jq -r 'if (.meta.warnings | any(contains("0 件しか抽出できなかった"))) then "warn" else "quiet" end')"
+  if [ "$actual" != "$expected" ]; then
+    echo "day boundary: mtime $stamp expected $expected, got $actual" >&2
+    exit 1
+  fi
+done <<'BOUNDS'
+202608312359.00 quiet
+202609010000.00 warn
+202609012359.59 warn
+202609020000.00 quiet
+BOUNDS
+
 off_day_cursor="$FIXTURE_ROOT/cursor-offday"
 mkdir -p "$off_day_cursor/sample/agent-transcripts/old-session"
 command cat > "$off_day_cursor/sample/agent-transcripts/old-session/old-session.jsonl" <<'JSONL'

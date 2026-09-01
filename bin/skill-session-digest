@@ -83,6 +83,8 @@ case "$DAY" in
   *) echo "date must be YYYY-MM-DD: $DAY" >&2; exit 2 ;;
 esac
 
+PREV_DAY="$(date -j -v-1d -f '%Y-%m-%d' "$DAY" +%Y-%m-%d)"
+
 TZ_NAME="$(date +%Z)"
 TZ_OFFSET="$(date +%z)"
 OFFSET_SECONDS=$(( ${TZ_OFFSET:0:1}1 * ( 10#${TZ_OFFSET:1:2} * 3600 + 10#${TZ_OFFSET:3:2} * 60 ) ))
@@ -132,8 +134,11 @@ files_touched_on_day() {
   local root="$1"
   local pattern="$2"
 
+  # 下限を前日 23:59:59 にするのは、`-newermt` が「厳密に新しい」判定で、
+  # mtime がちょうど 00:00:00 のファイルを落とすため（実測で検出漏れを確認）。
+  # 前日の最後の 1 秒を巻き込むが、この件数は「当日ログの有無」の目安にしか使わない。
   command find "$root" -type f -name "$pattern" \
-    -newermt "$DAY 00:00:00" ! -newermt "$DAY 23:59:59" 2>/dev/null | wc -l | tr -d ' '
+    -newermt "$PREV_DAY 23:59:59" ! -newermt "$DAY 23:59:59" 2>/dev/null | wc -l | tr -d ' '
 }
 
 oldest_file_date() {
