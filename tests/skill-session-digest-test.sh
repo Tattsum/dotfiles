@@ -114,6 +114,20 @@ jq -e '
   and (.meta.warnings | any(contains("Cursor metadata did not match 1 transcript")))
 ' <<< "$cursor_mismatch" >/dev/null
 
+broken_db="$FIXTURE_ROOT/broken-state.vscdb"
+command cp "$CURSOR_DB" "$broken_db"
+sqlite3 "$broken_db" 'UPDATE composerHeaders SET createdAt = NULL, lastUpdatedAt = NULL;'
+broken_meta="$($DIGEST 2026-09-01 --source all \
+  --claude-root "$CLAUDE_ROOT" \
+  --cursor-root "$CURSOR_ROOT" --cursor-state-db "$broken_db" \
+  --codex-root "$CODEX_ROOT")"
+jq -e '
+  .meta.sources_resolved == ["claude", "cursor", "codex"]
+  and .stats.prompts_kept == 3
+  and ([.projects[] | select(.sources == ["cursor"]) | .time_precision] == [["file"]])
+  and (.meta.warnings | any(contains("Cursor metadata did not match 1 transcript")))
+' <<< "$broken_meta" >/dev/null
+
 partial="$($DIGEST 2026-09-01 --source all \
   --claude-root "$CLAUDE_ROOT" \
   --cursor-root "$FIXTURE_ROOT/missing-cursor" --cursor-state-db "$CURSOR_DB" \

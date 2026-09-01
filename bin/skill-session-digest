@@ -218,17 +218,28 @@ cursor_metadata() {
     return
   fi
 
-  jq '
+  # 時刻の無い行は map から落とす。突合できなかった transcript として file 精度へ
+  # 縮退するので、Cursor 全体を捨てずに済む。jq 自体の失敗も潰して続行するのは、
+  # 1 行の異常データが set -e で digest 全体を殺し、Cursor だけでなく Claude / Codex の
+  # 集計まで失われるため（実測: createdAt が NULL の行 1 件で exit 5・出力ゼロ）。
+  # ヘッダの `fromjson?` と同じ方針で、壊れた入力は落として残りを出す。
+  if ! jq '
     map(. as $row
       | (($row.value | fromjson?) // {}) as $value
+      | (($row.lastUpdatedAt // 0) as $updated
+         | if $updated > 0 then $updated else ($row.createdAt // 0) end) as $millis
+      | select($millis > 0)
       | {key: $row.composerId,
          value: {
-           epoch: ((if (($row.lastUpdatedAt // 0) > 0) then $row.lastUpdatedAt else $row.createdAt end) / 1000 | floor),
+           epoch: ($millis / 1000 | floor),
            cwd: ($value.workspaceIdentifier.uri.fsPath // ""),
            title: ($value.name // "")
          }})
     | from_entries
-  ' "$rows" > "$output"
+  ' "$rows" > "$output" 2>/dev/null; then
+    add_warning "Cursor metadata could not be parsed; transcript file times will be used"
+    printf '{}\n' > "$output"
+  fi
   rm -f "$rows"
 }
 
