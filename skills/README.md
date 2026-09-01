@@ -17,7 +17,7 @@ skills/
 ├── README.md
 ├── Makefile
 └── src/
-    ├── dotfiles-plan-first/SKILL.md            # 実装着手前の標準WF（issue/Jira起点可・調査→技術選定→検証→/grill-me合意→実装→lint/test）
+    ├── dotfiles-plan-first/SKILL.md            # 実装着手前の標準WF（issue/Jira起点可・調査→技術選定→検証→grill-me合意→実装→lint/test）
     ├── dotfiles-atlassian-investigate/SKILL.md # Jira/Confluence の URL 起点で調査し回答草案まで（読み取り専用・投稿しない）
     ├── dotfiles-commit-push/SKILL.md           # 秘密情報チェック + コミット規約を強制して commit / push
     ├── dotfiles-pr-create/SKILL.md             # push 済みブランチから PR を作成（既定 draft, base 自動判定）
@@ -68,6 +68,8 @@ skills/
     │   └── INTERFACE-DESIGN.md
     ├── devin-task-triage/SKILL.md              # 開発タスクを Devin 送り / ここで処理 に振り分け
     ├── prompt-pattern-scan/SKILL.md            # プロンプト履歴から繰り返し作業を抽出しスキル化候補を出す
+    ├── grill-me/SKILL.md                       # 設計・計画を問いで詰める明示起動エントリポイント
+    ├── grilling/SKILL.md                       # bounded な設計インタビューの実体
     └── dotfiles-nippo/SKILL.md                 # セッションログから日報を生成（内省は書かず問いだけ残す）
 ```
 
