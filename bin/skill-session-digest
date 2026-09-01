@@ -1,11 +1,13 @@
 #!/usr/bin/env bash
 
-# Claude Code のセッションログ（~/.claude/projects/**/*.jsonl）から、指定日の作業を
-# 日報生成用の軽量 JSON に落とす。dotfiles-nippo skill の入力。
+# Claude Code / Cursor / Codex のセッションログを共通レコードへ正規化し、
+# 日報生成用の軽量 JSON に集約する。判断や要約は持ち込まず、観測事実だけを扱う。
 #
-# 判断（要約・分類・評価・良し悪し）は持ち込まない。事実を集めて圧縮するだけ。
-# bin/skill-resolve-diff / bin/skill-review-state と同じ責務分割で、散文で同じ手順を
-# 書くとドリフトするのを防ぐために決定的処理をここに閉じ込める。
+# 3ソースを別々の digest に分けず 1 本のレコード列へ正規化するのは、同じリポジトリを
+# 別エージェントで触った日に、日報側で突合させる作業が発生するため。git トップレベルで
+# 畳めば 1 プロジェクトに収まる。代わりにソース毎の時刻精度が揃わないので、レコードに
+# precision を持たせて projects[].time_precision として出す（捨てると Cursor の粗い時刻が
+# Claude の event 時刻と同じ顔で並ぶ）。
 #
 # 圧縮しない選択は取れない。実測（2026-08-20）で 1 日分の生データは prompt 141 件
 # 567KB ＋ tool_use 1,194 件 335KB あり、そのままモデルに渡すとコンテキストに乗らない。
@@ -15,46 +17,65 @@
 # プレフィルタ有無の差は 2.4 秒しかない。corpus は保持期間（実測約 32 日）で頭打ちに
 # なるため、将来も増え続けない。
 #
-# `awk 1` を挟むのは末尾改行の無いファイル対策。複数ファイルを 1 つの jq プロセスに
-# 渡すと、末尾改行が無いファイルの最終行と次ファイルの先頭行が連結して 1 レコード
-# 消える（実測で再現済み・現状 0/1205 だが潜在）。`fromjson?` は壊れた行のスキップ用で、
-# これが無いと 1 行の破損で jq が exit 1 し、残り全ファイルがサイレントに欠落する。
-#
-# agent-*.jsonl（サブエージェントの記録）は除外する。日報の主語は人間の作業であり、
-# サブエージェント内部のツール実行まで数えると tool_frequency が実態から乖離する。
+# サブエージェントの記録は全ソースで除外する（Claude の `agent-*.jsonl`、Cursor の
+# `subagents/` と composerHeaders.isSubagent、Codex の parent_thread_id / agent_path /
+# session_meta.source がオブジェクトの行）。日報の主語は人間の作業であり、
+# サブエージェント内部のツール実行まで数えると tool 集計が実態から乖離する。
 #
 # Usage:
-#   skill-session-digest [YYYY-MM-DD] [--project <部分一致>] [--root <dir>]
+#   skill-session-digest [YYYY-MM-DD] [options]   # 詳細は --help
 #
-#   --project は出力に現れるプロジェクトパス（git トップレベルに畳んだ後）への部分一致。
-#
-# Output: stdout に JSON 1 オブジェクト
-#   meta      date / timezone / source / files_scanned / retention_oldest
-#   stats     prompts_total（ノイズ除去前）/ prompts_kept / projects / sessions
-#             / tool_calls / by_hour / tools
-#   projects[] cwd, name, branches[], sessions[]{id,title}, span{from,to},
-#              tools{}, git_commands[], files_touched[], prompts[]{time,text}
+# Output: stdout に JSON 1 オブジェクト（meta.schema_version = 2）
 #
 # 出力にはリポジトリ名・ブランチ名・プロンプト本文がそのまま含まれる。business 文脈では
 # 顧客名・案件名を含むため、リポジトリ内に書き出さないこと（呼び出し側の責務）。
+# この dotfiles は public なので特に注意する。
 
 set -euo pipefail
 
-ROOT="$HOME/.claude/projects"
+SOURCE="all"
 DAY=""
 PROJECT=""
 MAX_PROMPT_CHARS=1000
+CLAUDE_ROOT="${CLAUDE_CONFIG_DIR:-$HOME/.claude}/projects"
+CURSOR_ROOT="${CURSOR_CONFIG_DIR:-$HOME/.cursor}/projects"
+CURSOR_STATE_DB="$HOME/Library/Application Support/Cursor/User/globalStorage/state.vscdb"
+CODEX_ROOT="${CODEX_HOME:-$HOME/.codex}/sessions"
+
+usage() {
+  command cat <<'USAGE'
+Usage:
+  skill-session-digest [YYYY-MM-DD] [options]
+
+Options:
+  --source <all|claude|cursor|codex>  Sources to collect (default: all)
+  --project <substring>               Filter normalized project paths
+  --root <dir>                        Alias for --claude-root
+  --claude-root <dir>                 Claude Code project log root
+  --cursor-root <dir>                 Cursor agent transcript root
+  --cursor-state-db <file>            Cursor state.vscdb path
+  --codex-root <dir>                  Codex rollout log root
+USAGE
+}
 
 while [ $# -gt 0 ]; do
   case "$1" in
+    --source) SOURCE="${2:-}"; shift 2 ;;
     --project) PROJECT="${2:-}"; shift 2 ;;
-    --root) ROOT="${2:-}"; shift 2 ;;
-    -h|--help) awk 'NR > 1 { if (/^#/) { sub(/^# ?/, ""); print; seen = 1 } else if (seen) exit }' "$0"
-               exit 0 ;;
+    --root|--claude-root) CLAUDE_ROOT="${2:-}"; shift 2 ;;
+    --cursor-root) CURSOR_ROOT="${2:-}"; shift 2 ;;
+    --cursor-state-db) CURSOR_STATE_DB="${2:-}"; shift 2 ;;
+    --codex-root) CODEX_ROOT="${2:-}"; shift 2 ;;
+    -h|--help) usage; exit 0 ;;
     -*) echo "unknown option: $1" >&2; exit 2 ;;
     *) DAY="$1"; shift ;;
   esac
 done
+
+case "$SOURCE" in
+  all|claude|cursor|codex) ;;
+  *) echo "source must be all, claude, cursor, or codex: $SOURCE" >&2; exit 2 ;;
+esac
 
 [ -n "$DAY" ] || DAY="$(date +%Y-%m-%d)"
 case "$DAY" in
@@ -62,16 +83,53 @@ case "$DAY" in
   *) echo "date must be YYYY-MM-DD: $DAY" >&2; exit 2 ;;
 esac
 
-[ -d "$ROOT" ] || { echo "session log root not found: $ROOT" >&2; exit 1; }
-
-# jq の strftime は UTC 固定。ローカル日付で切るためにオフセット秒を渡して足す。
 TZ_NAME="$(date +%Z)"
 TZ_OFFSET="$(date +%z)"
 OFFSET_SECONDS=$(( ${TZ_OFFSET:0:1}1 * ( 10#${TZ_OFFSET:1:2} * 3600 + 10#${TZ_OFFSET:3:2} * 60 ) ))
 
-FILES_SCANNED="$(find "$ROOT" -type f -name '*.jsonl' ! -name 'agent-*' | wc -l | tr -d ' ')"
-OLDEST="$(find "$ROOT" -type f -name '*.jsonl' ! -name 'agent-*' -exec stat -f '%m' {} + 2>/dev/null \
-  | sort -n | head -1 | xargs -I{} date -r {} +%Y-%m-%d 2>/dev/null || true)"
+RECORDS="$(mktemp -t skill-session-digest-records)"
+SOURCE_STATS="$(mktemp -t skill-session-digest-stats)"
+WARNINGS="$(mktemp -t skill-session-digest-warnings)"
+trap 'rm -f "$RECORDS" "$SOURCE_STATS" "$WARNINGS"' EXIT
+
+short_path() {
+  case "$1" in
+    "$HOME"*) printf '~%s' "${1#"$HOME"}" ;;
+    *) printf '%s' "$1" ;;
+  esac
+}
+
+selected() {
+  [ "$SOURCE" = "all" ] || [ "$SOURCE" = "$1" ]
+}
+
+add_warning() {
+  jq -Rn --arg message "$1" '$message' >> "$WARNINGS"
+}
+
+add_source_stat() {
+  jq -nc \
+    --arg source "$1" --arg root "$(short_path "$2")" --arg status "$3" \
+    --argjson files "$4" --argjson records "$5" --arg precision "$6" \
+    --arg oldest "$7" \
+    '{source: $source, root: $root, status: $status, files_scanned: $files,
+      records: $records, time_precision: $precision, retention_oldest: $oldest}' \
+    >> "$SOURCE_STATS"
+}
+
+oldest_file_date() {
+  local root="$1"
+  local pattern="$2"
+  local oldest_epoch
+
+  oldest_epoch="$(command find "$root" -type f -name "$pattern" -exec stat -f '%m' {} + 2>/dev/null \
+    | sort -n | head -1 || true)"
+  if [ -n "$oldest_epoch" ]; then
+    date -r "$oldest_epoch" +%Y-%m-%d
+  else
+    printf 'unknown'
+  fi
+}
 
 # nippo（nwiizo/nippo, MIT）の NOISE_PREFIXES を vendoring。ロジックは前方一致で自明だが、
 # リストそのものが 5 ヶ月分の観測の蓄積で、自作の素朴な版より 27% 多くノイズを落とす（実測）。
@@ -86,127 +144,349 @@ NOISE_PREFIXES='[
   "Base directory for this skill:", "(Re-invocation of /"
 ]'
 
-EXTRACT='
-def localpart($fmt): (.[0:19] + "Z" | fromdateiso8601 + $off | strftime($fmt));
+extract_claude() {
+  local files before after oldest
 
-select(type == "object")
-| if .type == "ai-title" then
-    { k: "a", sid: (.sessionId // ""), title: (.aiTitle // "") }
-  elif (.timestamp | type) != "string" then empty
-  elif (.timestamp | localpart("%Y-%m-%d")) != $day then empty
-  elif .type == "user" and (.isSidechain != true) and (.userType == "external") then
-    ( if (.message.content | type) == "string" then .message.content
-      else [ .message.content[]? | select(.type == "text") | .text // "" ] | join("\n")
-      end ) as $text
-    | if ($text | type) == "string" and ($text | length) > 0 then
-        { k: "p", time: (.timestamp | localpart("%H:%M")),
-          hour: (.timestamp | localpart("%H")),
-          cwd: (.cwd // ""), br: (.gitBranch // ""), sid: (.sessionId // ""),
-          text: $text }
-      else empty end
-  elif .type == "assistant" then
-    { cwd: (.cwd // ""), sid: (.sessionId // ""),
-      time: (.timestamp | localpart("%H:%M")) } as $ctx
-    | .message.content[]? | select(.type == "tool_use")
-    | $ctx + { k: "t", name: (.name // "?"),
-               arg: (.input.command // .input.file_path // .input.skill // .input.pattern // "") }
-  else empty end
-'
+  [ -d "$CLAUDE_ROOT" ] || {
+    add_warning "Claude log root not found: $(short_path "$CLAUDE_ROOT")"
+    add_source_stat "claude" "$CLAUDE_ROOT" "missing" 0 0 "event" "unknown"
+    return
+  }
 
-AGGREGATE='
+  files="$(command find "$CLAUDE_ROOT" -type f -name '*.jsonl' ! -name 'agent-*' | wc -l | tr -d ' ')"
+  oldest="$(oldest_file_date "$CLAUDE_ROOT" '*.jsonl')"
+  before="$(wc -l < "$RECORDS" | tr -d ' ')"
+
+  # `awk 1` を挟むのは末尾改行の無いファイル対策。複数ファイルを 1 つの jq プロセスに
+  # 渡すと、末尾改行が無いファイルの最終行と次ファイルの先頭行が連結して 1 レコード
+  # 消える（実測で再現済み・現状 0/1205 だが潜在）。`fromjson?` は壊れた行のスキップ用で、
+  # これが無いと 1 行の破損で jq が exit 1 し、残り全ファイルがサイレントに欠落する。
+  while IFS= read -r -d '' file; do
+    awk 1 "$file"
+  done < <(command find "$CLAUDE_ROOT" -type f -name '*.jsonl' ! -name 'agent-*' -print0) \
+    | jq -c -R --argjson off "$OFFSET_SECONDS" --arg day "$DAY" '
+        def localpart($fmt): (.[0:19] + "Z" | fromdateiso8601 + $off | strftime($fmt));
+        fromjson? // empty
+        | select(type == "object")
+        | if .type == "ai-title" then
+            {k: "a", source: "claude", sid: (.sessionId // ""), title: (.aiTitle // "")}
+          elif (.timestamp | type) != "string" then empty
+          elif (.timestamp | localpart("%Y-%m-%d")) != $day then empty
+          elif .type == "user" and (.isSidechain != true) and (.userType == "external") then
+            (if (.message.content | type) == "string" then .message.content
+             else [.message.content[]? | select(.type == "text") | .text // ""] | join("\n")
+             end) as $text
+            | select(($text | type) == "string" and ($text | length) > 0)
+            | {k: "p", source: "claude", precision: "event",
+               time: (.timestamp | localpart("%H:%M")), hour: (.timestamp | localpart("%H")),
+               cwd: (.cwd // ""), br: (.gitBranch // ""), sid: (.sessionId // ""), text: $text}
+          elif .type == "assistant" then
+            {source: "claude", precision: "event", cwd: (.cwd // ""), sid: (.sessionId // ""),
+             time: (.timestamp | localpart("%H:%M")), hour: (.timestamp | localpart("%H"))} as $ctx
+            | .message.content[]? | select(.type == "tool_use")
+            | $ctx + {k: "t", name: (.name // "?"),
+                      arg: (.input.command // .input.file_path // .input.skill // .input.pattern // "")}
+          else empty end
+      ' >> "$RECORDS"
+
+  after="$(wc -l < "$RECORDS" | tr -d ' ')"
+  add_source_stat "claude" "$CLAUDE_ROOT" "available" "$files" "$((after - before))" "event" "$oldest"
+}
+
+# Cursor の transcript は発話単位の timestamp を持たない。cwd・タイトル・時刻は
+# state.vscdb 側にしか無いため、SQLite を引く以外に突合手段が無い。Cursor 起動中でも
+# 触らないよう `-readonly` を付ける（書き込みロックを取ると Cursor 側が壊れうる）。
+# DB が無い・読めない場合に中断しないのは、transcript の mtime でも「その日に作業した」
+# という日報に必要な事実は残るため。精度が落ちたことは precision と warnings で伝える。
+cursor_metadata() {
+  local output="$1"
+  local rows
+
+  if [ ! -f "$CURSOR_STATE_DB" ]; then
+    add_warning "Cursor metadata DB not found; transcript file times will be used"
+    printf '{}\n' > "$output"
+    return
+  fi
+
+  rows="$(mktemp -t skill-session-digest-cursor-rows)"
+  if ! sqlite3 -readonly -json "$CURSOR_STATE_DB" \
+      'SELECT composerId, createdAt, lastUpdatedAt, value FROM composerHeaders WHERE COALESCE(isSubagent, 0) = 0;' \
+      > "$rows" 2>/dev/null; then
+    add_warning "Cursor metadata DB could not be read; transcript file times will be used"
+    printf '{}\n' > "$output"
+    rm -f "$rows"
+    return
+  fi
+
+  jq '
+    map(. as $row
+      | (($row.value | fromjson?) // {}) as $value
+      | {key: $row.composerId,
+         value: {
+           epoch: ((if (($row.lastUpdatedAt // 0) > 0) then $row.lastUpdatedAt else $row.createdAt end) / 1000 | floor),
+           cwd: ($value.workspaceIdentifier.uri.fsPath // ""),
+           title: ($value.name // "")
+         }})
+    | from_entries
+  ' "$rows" > "$output"
+  rm -f "$rows"
+}
+
+extract_cursor() {
+  local files before after oldest metadata file sid meta epoch cwd title fallback_cwd precision unmatched
+
+  [ -d "$CURSOR_ROOT" ] || {
+    add_warning "Cursor log root not found: $(short_path "$CURSOR_ROOT")"
+    add_source_stat "cursor" "$CURSOR_ROOT" "missing" 0 0 "session-or-file" "unknown"
+    return
+  }
+
+  files="$(command find "$CURSOR_ROOT" -type f -name '*.jsonl' -path '*/agent-transcripts/*' ! -path '*/subagents/*' | wc -l | tr -d ' ')"
+  oldest="$(oldest_file_date "$CURSOR_ROOT" '*.jsonl')"
+  before="$(wc -l < "$RECORDS" | tr -d ' ')"
+  metadata="$(mktemp -t skill-session-digest-cursor-meta)"
+  cursor_metadata "$metadata"
+  unmatched=0
+
+  while IFS= read -r -d '' file; do
+    sid="$(basename "$file" .jsonl)"
+    meta="$(jq -c --arg sid "$sid" '.[$sid] // empty' "$metadata")"
+    fallback_cwd="cursor://$(basename "$(dirname "$(dirname "$(dirname "$file")")")")"
+
+    # 突合できた場合もセッション単位の 1 時刻しか無く、発話毎の時刻は復元できない。
+    # それらしい時刻を按分して埋めると Claude の event 時刻と区別が付かなくなるので、
+    # セッション時刻をそのまま全レコードに配り precision で区別する。
+    if [ -n "$meta" ]; then
+      epoch="$(jq -r '.epoch' <<< "$meta")"
+      cwd="$(jq -r '.cwd // ""' <<< "$meta")"
+      title="$(jq -r '.title // ""' <<< "$meta")"
+      precision="session"
+      [ -n "$cwd" ] || cwd="$fallback_cwd"
+    else
+      epoch="$(stat -f '%m' "$file")"
+      cwd="$fallback_cwd"
+      title=""
+      precision="file"
+      unmatched=$((unmatched + 1))
+    fi
+
+    jq -nc --arg sid "$sid" --arg title "$title" \
+      '{k: "a", source: "cursor", sid: $sid, title: $title}' >> "$RECORDS"
+
+    awk 1 "$file" \
+      | jq -c -R --argjson epoch "$epoch" --argjson off "$OFFSET_SECONDS" --arg day "$DAY" \
+          --arg cwd "$cwd" --arg sid "$sid" --arg precision "$precision" '
+          def localpart($fmt): ($epoch + $off | strftime($fmt));
+          fromjson? // empty
+          | select(($epoch + $off | strftime("%Y-%m-%d")) == $day)
+          | if .role == "user" then
+              (if (.message.content | type) == "string" then .message.content
+               else [.message.content[]? | select(.type == "text") | .text // ""] | join("\n") end) as $text
+              | select(($text | type) == "string" and ($text | length) > 0)
+              | {k: "p", source: "cursor", precision: $precision, time: localpart("%H:%M"), hour: "",
+                 cwd: $cwd, br: "", sid: $sid, text: $text}
+            elif .role == "assistant" then
+              .message.content[]? | select(.type == "tool_use")
+              | {k: "t", source: "cursor", precision: $precision, time: localpart("%H:%M"), hour: "",
+                 cwd: $cwd, sid: $sid, name: (.name // "?"),
+                 arg: (.input.command // .input.file_path // .input.skill // .input.pattern // "")}
+            else empty end
+        ' >> "$RECORDS"
+  done < <(command find "$CURSOR_ROOT" -type f -name '*.jsonl' -path '*/agent-transcripts/*' ! -path '*/subagents/*' -print0)
+
+  if [ "$unmatched" -gt 0 ]; then
+    add_warning "Cursor metadata did not match $unmatched transcript(s); file times were used"
+  fi
+  rm -f "$metadata"
+  after="$(wc -l < "$RECORDS" | tr -d ' ')"
+  add_source_stat "cursor" "$CURSOR_ROOT" "available" "$files" "$((after - before))" "session-or-file" "$oldest"
+}
+
+extract_codex() {
+  local files before after oldest file
+
+  [ -d "$CODEX_ROOT" ] || {
+    add_warning "Codex log root not found: $(short_path "$CODEX_ROOT")"
+    add_source_stat "codex" "$CODEX_ROOT" "missing" 0 0 "event" "unknown"
+    return
+  }
+
+  files="$(command find "$CODEX_ROOT" -type f -name 'rollout-*.jsonl' | wc -l | tr -d ' ')"
+  oldest="$(oldest_file_date "$CODEX_ROOT" 'rollout-*.jsonl')"
+  before="$(wc -l < "$RECORDS" | tr -d ' ')"
+
+  while IFS= read -r -d '' file; do
+    awk 1 "$file" | jq -c -R 'fromjson? // empty' \
+      | jq -cs --argjson off "$OFFSET_SECONDS" --arg day "$DAY" '
+          def localpart($value; $fmt): ($value[0:19] + "Z" | fromdateiso8601 + $off | strftime($fmt));
+          def call_arg:
+            if .payload.name == "exec_command" or .payload.name == "shell_command" then
+              ((.payload.arguments | fromjson? | .cmd) // "")
+            else "" end;
+          . as $rows
+          | ([$rows[] | select(.type == "session_meta") | .payload] | first) as $meta
+          | select($meta != null)
+          | select(($meta.source | type) != "object")
+          | select(($meta.parent_thread_id // null) == null and ($meta.agent_path // null) == null)
+          | ({k: "a", source: "codex", sid: ($meta.id // ""), title: ""}),
+            ($rows[]
+             | select((.timestamp | type) == "string")
+             | select(localpart(.timestamp; "%Y-%m-%d") == $day)
+             | if .type == "event_msg" and .payload.type == "user_message" then
+                 {k: "p", source: "codex", precision: "event",
+                  time: localpart(.timestamp; "%H:%M"), hour: localpart(.timestamp; "%H"),
+                  cwd: ($meta.cwd // ""), br: ($meta.git.branch // ""), sid: ($meta.id // ""),
+                  text: (.payload.message // "")}
+                 | select((.text | length) > 0)
+               elif .type == "response_item" and .payload.type == "function_call" then
+                 {k: "t", source: "codex", precision: "event",
+                  time: localpart(.timestamp; "%H:%M"), hour: localpart(.timestamp; "%H"),
+                  cwd: ($meta.cwd // ""), sid: ($meta.id // ""),
+                  name: (if .payload.name == "exec_command" or .payload.name == "shell_command" then "Bash"
+                         elif .payload.name == "apply_patch" then "Edit" else (.payload.name // "?") end),
+                  arg: call_arg}
+               elif .type == "response_item" and .payload.type == "custom_tool_call" then
+                 (.payload.input // "") as $input
+                 | {k: "t", source: "codex", precision: "event",
+                    time: localpart(.timestamp; "%H:%M"), hour: localpart(.timestamp; "%H"),
+                    cwd: ($meta.cwd // ""), sid: ($meta.id // ""),
+                    name: (if .payload.name == "apply_patch" then "Edit" else (.payload.name // "?") end),
+                    arg: (if .payload.name == "apply_patch" then
+                            ([ $input | scan("\\*\\*\\* (?:Add|Update|Delete) File: ([^\\n]+)") ]
+                             | first // "" | if type == "array" then .[0] else . end)
+                          else "" end)}
+               elif .type == "response_item" and .payload.type == "web_search_call" then
+                 {k: "t", source: "codex", precision: "event",
+                  time: localpart(.timestamp; "%H:%M"), hour: localpart(.timestamp; "%H"),
+                  cwd: ($meta.cwd // ""), sid: ($meta.id // ""), name: "web_search", arg: ""}
+               else empty end)
+        ' >> "$RECORDS"
+  done < <(command find "$CODEX_ROOT" -type f -name 'rollout-*.jsonl' -print0)
+
+  after="$(wc -l < "$RECORDS" | tr -d ' ')"
+  add_source_stat "codex" "$CODEX_ROOT" "available" "$files" "$((after - before))" "event" "$oldest"
+}
+
+selected "claude" && extract_claude
+selected "cursor" && extract_cursor
+selected "codex" && extract_codex
+
+# 1 ソースの欠落では止めない。3 エージェントのうち使っていないものは日常的に存在し、
+# そこで exit すると「その日に本当に作業していない」場合と区別が付かなくなる。
+# 全滅のときだけ落として、部分欠落は warnings で日報側に伝える。
+RESOLVED="$(jq -s '[.[] | select(.status == "available")] | length' "$SOURCE_STATS")"
+if [ "$RESOLVED" -eq 0 ]; then
+  echo "no selected session log source is available" >&2
+  exit 1
+fi
+
 # cwd をそのままプロジェクトにすると、リポジトリ内でディレクトリを移動しただけで
 # 別プロジェクトが生える（実測では 1 つのリポジトリが terraform / environments /
 # staging / production など 7 個に分裂した）。git のトップレベルに寄せて畳む。
-map(if (.cwd | type) == "string" then .cwd = ($roots[.cwd] // .cwd) else . end)
-# --project は畳んだ後のパスに掛ける。出力に出るプロジェクト名でそのまま絞れないと、
-# ユーザーが見えている名前（例: dev-local-scripts）で 0 件になる。
-| map(select(.k == "a" or $project == "" or ((.cwd // "") | contains($project))))
-| def home_short: sub("^" + $home; "~");
-# 一時ディレクトリは「プロジェクト」でも「触ったファイル」でもない。scratchpad は
-# セッション毎に切られるため、除外しないと日報に毎日ちがう偽プロジェクトが並ぶ。
-def is_ephemeral:
-  startswith("/tmp/") or startswith("/private/tmp/")
-  or startswith("/var/folders/") or startswith("/private/var/folders/")
-  or (contains("/scratchpad"));
-def trunc($n): if (. | length) > $n then (.[0:$n] + " …[truncated]") else . end;
-def trimmed: sub("^[\\s\\u3000]+"; "") | sub("[\\s\\u3000]+$"; "");
-def is_noise:
-  . as $t
-  | ($t | length) == 0
-    or ([ $noise[] | select(. as $prefix | $t | startswith($prefix)) ] | length) > 0
-    or ( ($t | sub("[.,!?。、！？\\s]+$"; "") | ascii_downcase)
-         | . == "y" or . == "yes" or . == "ok" or . == "okay" or . == "done" or . == "はい" );
-
-( [ .[] | select(.k == "a") ] | map({ (.sid): .title }) | add // {} ) as $titles
-| [ .[] | select(.k == "t") ] as $tools
-| [ .[] | select(.k == "p") | .text |= trimmed ] as $raw_prompts
-| ( [ $raw_prompts[] | select((.text | is_noise) | not) | .text |= trunc($chars) ]
-    | unique_by([.cwd, .time, .text]) ) as $prompts
-| ( [ $prompts[].cwd, $tools[].cwd ] | map(select(is_ephemeral | not)) | unique ) as $cwds
-| {
-    meta: {
-      date: $day,
-      timezone: $tz,
-      source: ($root | home_short),
-      files_scanned: $files,
-      retention_oldest: $oldest,
-      prompt_truncated_at: $chars
-    },
-    stats: {
-      prompts_total: ($raw_prompts | length),
-      prompts_kept: ($prompts | length),
-      projects: ($cwds | length),
-      sessions: ([ $prompts[].sid ] | unique | length),
-      tool_calls: ($tools | length),
-      by_hour: ( [ $prompts[].hour ] | group_by(.) | map({ key: .[0], value: length }) | from_entries ),
-      tools: ( [ $tools[].name ] | group_by(.) | map({ key: .[0], value: length })
-               | sort_by(-.value) | from_entries )
-    },
-    projects: [
-      $cwds[] as $cwd
-      | ( [ $prompts[] | select(.cwd == $cwd) ] ) as $ps
-      | ( [ $tools[] | select(.cwd == $cwd) ] ) as $ts
-      | {
-          cwd: ($cwd | home_short),
-          name: ($cwd | split("/") | last),
-          branches: ( [ $ps[].br ] | map(select(. != "")) | unique ),
-          sessions: ( [ $ps[].sid, $ts[].sid ] | unique
-                      | map({ id: .[0:8], title: ($titles[.] // "") }) ),
-          span: { from: ( [ $ps[].time, $ts[].time ] | min ),
-                  to:   ( [ $ps[].time, $ts[].time ] | max ) },
-          tools: ( [ $ts[].name ] | group_by(.) | map({ key: .[0], value: length })
-                   | sort_by(-.value) | from_entries ),
-          git_commands: ( [ $ts[] | select(.name == "Bash" and (.arg | startswith("git ")))
-                            | .arg | gsub("\\s+"; " ") | trunc(200) ] | unique | .[0:40] ),
-          files_touched: ( [ $ts[] | select(.name == "Edit" or .name == "Write" or .name == "NotebookEdit")
-                             | .arg | select(. != "" and (is_ephemeral | not)) | home_short ]
-                           | unique | .[0:30] ),
-          # セッションを再開すると過去のやり取りが新しいファイルにも書き戻され、同一発話が
-          # 複数ファイルに現れる（実測で同じ prompt が 2 回計上された）。時刻＋本文で潰す。
-          prompts: ( [ $ps[] | { time, text } ] | sort_by(.time) )
-        }
-      | select((.prompts | length) > 0 or (.tools | length) > 0)
-    ] | sort_by(- (.prompts | length))
-  }
-'
-
-RECORDS="$(mktemp -t skill-session-digest)"
-trap 'rm -f "$RECORDS"' EXIT
-
-find "$ROOT" -type f -name '*.jsonl' ! -name 'agent-*' -print0 \
-  | xargs -0 awk 1 \
-  | jq -c -R --argjson off "$OFFSET_SECONDS" --arg day "$DAY" \
-        'fromjson? // empty | '"$EXTRACT" > "$RECORDS"
-
-# cwd → git トップレベルの対応表。作業ツリーが消えている cwd は自分自身に落とす。
-CWD_ROOTS="$(jq -r '.cwd // empty' "$RECORDS" | sort -u \
+# これがソースを跨いだ統合も兼ねる（同じ repo を Claude と Cursor で触っても 1 行）。
+CWD_ROOTS="$(jq -r 'select(.cwd != null and .cwd != "") | .cwd' "$RECORDS" | sort -u \
   | while IFS= read -r dir; do
       printf '%s\t%s\n' "$dir" "$(git -C "$dir" rev-parse --show-toplevel 2>/dev/null || echo "$dir")"
     done \
-  | jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | { (.[0]): .[1] }) | add // {}')"
+  | jq -R -s 'split("\n") | map(select(length > 0) | split("\t") | {(.[0]): .[1]}) | add // {}')"
 
-jq -s --arg day "$DAY" --arg tz "$TZ_NAME" --arg root "$ROOT" --arg home "$HOME" \
-      --arg oldest "${OLDEST:-unknown}" --argjson files "$FILES_SCANNED" \
-      --argjson chars "$MAX_PROMPT_CHARS" --argjson noise "$NOISE_PREFIXES" \
-      --argjson roots "$CWD_ROOTS" --arg project "$PROJECT" \
-      "$AGGREGATE" "$RECORDS"
+SOURCE_STATS_JSON="$(jq -s '.' "$SOURCE_STATS")"
+WARNINGS_JSON="$(jq -s '.' "$WARNINGS")"
+
+jq -s \
+  --arg day "$DAY" --arg tz "$TZ_NAME" --arg home "$HOME" --arg requested "$SOURCE" \
+  --argjson chars "$MAX_PROMPT_CHARS" --argjson noise "$NOISE_PREFIXES" \
+  --argjson roots "$CWD_ROOTS" --arg project "$PROJECT" \
+  --argjson source_stats "$SOURCE_STATS_JSON" --argjson warnings "$WARNINGS_JSON" '
+  map(if (.cwd | type) == "string" then .cwd = ($roots[.cwd] // .cwd) else . end)
+  # --project は畳んだ後のパスに掛ける。出力に出るプロジェクト名でそのまま絞れないと、
+  # ユーザーが見えている名前（例: dev-local-scripts）で 0 件になる。
+  | map(select(.k == "a" or $project == "" or ((.cwd // "") | contains($project))))
+  | def home_short:
+      if startswith($home) then "~" + .[($home | length):] else . end;
+  # 一時ディレクトリは「プロジェクト」でも「触ったファイル」でもない。scratchpad は
+  # セッション毎に切られるため、除外しないと日報に毎日ちがう偽プロジェクトが並ぶ。
+  def is_ephemeral:
+    startswith("/tmp/") or startswith("/private/tmp/")
+    or startswith("/var/folders/") or startswith("/private/var/folders/")
+    or contains("/scratchpad");
+  def trunc($n): if length > $n then .[0:$n] + " …[truncated]" else . end;
+  def trimmed: sub("^[\\s\\u3000]+"; "") | sub("[\\s\\u3000]+$"; "");
+  def is_noise:
+    . as $text
+    | length == 0
+      or ([$noise[] | select(. as $prefix | $text | startswith($prefix))] | length) > 0
+      or ((sub("[.,!?。、！？\\s]+$"; "") | ascii_downcase)
+          | . == "y" or . == "yes" or . == "ok" or . == "okay" or . == "done" or . == "はい");
+
+  # セッション ID はソース毎に採番されるため、キーを sid だけにすると別エージェントの
+  # 同名セッションでタイトルが上書きされうる。source を前置して名前空間を分ける。
+  ([.[] | select(.k == "a")] | map({((.source + ":" + .sid)): .title}) | add // {}) as $titles
+  | [.[] | select(.k == "t")] as $tools
+  | [.[] | select(.k == "p") | .text |= trimmed] as $raw_prompts
+  # セッションを再開すると過去のやり取りが新しいファイルにも書き戻され、同一発話が
+  # 複数ファイルに現れる（実測で同じ prompt が 2 回計上された）。時刻＋本文で潰す。
+  # source をキーに含めるのは、別エージェントで同じ指示を出した場合は別の作業であり、
+  # 潰すと「両方で試した」という事実が消えるため。
+  | ([$raw_prompts[] | select((.text | is_noise) | not) | .text |= trunc($chars)]
+     | unique_by([.source, .cwd, .time, .text])) as $prompts
+  | ([$prompts[].cwd, $tools[].cwd]
+     | map(select(type == "string" and . != "" and (is_ephemeral | not))) | unique) as $cwds
+  | {
+      meta: {
+        # 単一ソース前提の meta.source / files_scanned を source_stats へ置き換えたため、
+        # 旧 digest JSON を読むスキル側が黙って誤読しないよう版を明示する。
+        schema_version: 2,
+        date: $day,
+        timezone: $tz,
+        sources_requested: $requested,
+        sources_resolved: ([$source_stats[] | select(.status == "available") | .source]),
+        source_stats: $source_stats,
+        warnings: $warnings,
+        retention_oldest: ([$source_stats[].retention_oldest | select(. != "unknown")] | min // "unknown"),
+        prompt_truncated_at: $chars
+      },
+      stats: {
+        prompts_total: ($raw_prompts | length),
+        prompts_kept: ($prompts | length),
+        projects: ($cwds | length),
+        sessions: ([$prompts[] | [.source, .sid]] | unique | length),
+        tool_calls: ($tools | length),
+        # Cursor は発話時刻を持たないので hour が空になる。0 時などに丸めて混ぜると
+        # 稼働時間帯の山・谷という by_hour の唯一の用途が壊れるため、集計から外す。
+        by_hour: ([$prompts[] | select(.hour != "") | .hour]
+                  | group_by(.) | map({key: .[0], value: length}) | from_entries),
+        tools: ([$tools[].name] | group_by(.) | map({key: .[0], value: length})
+                | sort_by(-.value) | from_entries)
+      },
+      projects: [
+        $cwds[] as $cwd
+        | ([$prompts[] | select(.cwd == $cwd)]) as $project_prompts
+        | ([$tools[] | select(.cwd == $cwd)]) as $project_tools
+        | {
+            cwd: ($cwd | home_short),
+            name: ($cwd | split("/") | last),
+            sources: ([$project_prompts[].source, $project_tools[].source] | unique),
+            time_precision: ([$project_prompts[].precision, $project_tools[].precision] | unique),
+            branches: ([$project_prompts[].br] | map(select(. != "")) | unique),
+            sessions: ([$project_prompts[], $project_tools[]]
+                       | unique_by([.source, .sid])
+                       | map({source, id: (.sid[0:8]), title: ($titles[.source + ":" + .sid] // "")})),
+            span: {
+              from: ([$project_prompts[].time, $project_tools[].time] | min),
+              to: ([$project_prompts[].time, $project_tools[].time] | max)
+            },
+            tools: ([$project_tools[].name] | group_by(.) | map({key: .[0], value: length})
+                    | sort_by(-.value) | from_entries),
+            git_commands: ([$project_tools[] | select(.name == "Bash" and (.arg | startswith("git ")))
+                            | .arg | gsub("\\s+"; " ") | trunc(200)] | unique | .[0:40]),
+            files_touched: ([$project_tools[]
+                              | select(.name == "Edit" or .name == "Write" or .name == "NotebookEdit")
+                              | .arg | select(. != "" and (is_ephemeral | not)) | home_short]
+                            | unique | .[0:30]),
+            prompts: ([$project_prompts[] | {source, time, precision, text}] | sort_by(.time, .source))
+          }
+        | select((.prompts | length) > 0 or (.tools | length) > 0)
+      ] | sort_by(-(.prompts | length))
+    }
+  ' "$RECORDS"

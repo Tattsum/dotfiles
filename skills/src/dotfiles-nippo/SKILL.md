@@ -1,8 +1,8 @@
 ---
 name: dotfiles-nippo
 description: >-
-  Claude Code のセッションログ（~/.claude/projects/**/*.jsonl）から指定日の日報を生成するとき。
-  bin/skill-session-digest で事実だけを集約し、やったこと・判断の記録・詰まった点・統計と、
+  Claude Code / Cursor / Codex のローカルセッションログから指定日の日報を生成するとき。
+  bin/skill-session-digest で3ソースの事実だけを集約し、やったこと・判断の記録・詰まった点・統計と、
   観測に紐づく学び・明日の小さな一歩を Markdown にまとめて ~/.claude/nippo/YYYY-MM-DD.md に
   書き出す。振り返りの問いへの回答は書かず、空欄のまま人間に残す。「日報を書いて」「今日の作業を
   まとめて」「昨日の日報」「8/20 の日報を作って」等で発動。
@@ -14,7 +14,7 @@ allowed-tools: [Bash, Read, Write]
 
 # 日報生成スキル
 
-Claude Code のセッションログを日報にする。**ツールは観測できることだけを出し、内省は人間が書く**。
+Claude Code / Cursor / Codex のセッションログを日報にする。**ツールは観測できることだけを出し、内省は人間が書く**。
 この分担が本スキルの設計の中心で、自動生成された振り返りを読み返しても何も残らないという
 上流（nwiizo/nippo, MIT）の観察を採用している。
 
@@ -37,6 +37,8 @@ Claude Code のセッションログを日報にする。**ツールは観測で
 ## 構成（単一ロジック源）
 
 - 事実の集約: `skill-session-digest`（`bin/skill-session-digest` が正本・PATH 上に symlink）
+  - 既定は利用可能な Claude Code / Cursor / Codex をすべて収集する
+  - 必要な場合だけ `--source claude|cursor|codex|all` で絞る
 - Notion への投稿: `skill-nippo-notion-post`（`bin/skill-nippo-notion-post` が正本）
 - 出力先: `~/.claude/nippo/YYYY-MM-DD.md`
 - 中間ファイル: `~/.claude/nippo/.digest-YYYY-MM-DD.json`（生成後に削除する）
@@ -61,7 +63,11 @@ skill-session-digest <YYYY-MM-DD> > ~/.claude/nippo/.digest-<YYYY-MM-DD>.json
 ```
 
 特定プロジェクトだけに絞る指示があれば `--project <部分一致>` を付ける。
-生成した JSON を `Read` する。**セッションログの JSONL を直接読むことは絶対にしない。**
+特定エージェントだけに絞る指示があれば `--source <claude|cursor|codex>` を付ける。
+生成した JSON を `Read` する。**セッションログの JSONL や Cursor の SQLite を直接読むことは絶対にしない。**
+
+`meta.warnings` があれば、欠落したソースと継続して使えたソースを日報提示時に伝える。
+1ソースの欠落だけで日報生成を止めない。集約器が非0終了した場合だけ、利用可能なログが無いとして止める。
 
 `stats.prompts_kept` と `stats.tool_calls` が両方 0 なら、その日は記録が無い。
 日報を捏造せず「対象日の記録がありません」と伝えて終了する。
@@ -95,7 +101,7 @@ skill-session-digest <YYYY-MM-DD> > ~/.claude/nippo/.digest-<YYYY-MM-DD>.json
 
 ## 統計
 - プロンプト {kept} 件（除去前 {total}）／ツール {tool_calls} 回（上位 3 つ）／{projects} プロジェクト・{sessions} セッション
-- 稼働 HH〜HH 時。by_hour の山と谷を 1 行で
+- 稼働 HH〜HH 時。by_hour の山と谷を 1 行で（event 時刻を持つソースだけを対象）
 
 ## 今日の学び
 （**最大 3 件・各 1 行**。digest の観測（時刻・回数・ファイル・エラー）に必ず紐づける。
@@ -113,6 +119,14 @@ skill-session-digest <YYYY-MM-DD> > ~/.claude/nippo/.digest-<YYYY-MM-DD>.json
 
 「明日の小さな一歩」を `- [ ]` にしているのは、Notion 側で `to_do`（チェックボックス）になり
 翌日に消化を確認できるため。ローカルの md でもチェックリストとして読める。
+
+`projects[].sources` は、そのプロジェクトで使ったエージェントを示す。同じ git ルートは
+ソースを跨いで1プロジェクトへ統合済みなので、エージェント別に重複して書かない。
+Cursor は発話単位の timestamp を持たず、metadata と突合できれば `time_precision` は
+`session`、できなければ transcript の更新日時を使うため `file` になる。
+Cursor の時刻を時間帯の山・谷や正確な着手時刻の根拠に使わない。Cursor しか記録がない日は、
+時間帯統計を推測せず、`session` なら「セッション単位の時刻のみ」、`file` なら
+「ファイル更新日時ベースの低精度時刻のみ」と書く。
 
 ## 4. 後片付けと提示
 
@@ -227,9 +241,10 @@ multi_select が無ければ、タグは付けずに投稿する。アイコン�
 
 ## 対象範囲（意図的にやらないこと）
 
-- **Claude Code のログのみ**。Codex（`~/.codex/`）は見ない。
-- **`agent-*.jsonl` は集計外**。日報の主語は人間の作業で、サブエージェント内部の
-  ツール実行まで数えると実態から乖離する。
+- **Claude Code / Cursor / Codex のローカルログのみ**。クラウド上の履歴やNotionは生成入力にしない。
+- **サブエージェントログは集計外**。Claude の `agent-*.jsonl`、Cursor の `subagents/`、
+  Codex の subagent source を除外する。日報の主語は人間の作業で、内部のツール実行まで
+  数えると実態から乖離する。
 - **週次・月次・長期トレンドは扱わない**。ログ保持は実測で約 1 ヶ月しかなく、
   90 日レンジの集計は「入力が沈黙したまま、それらしい出力が出る」形で劣化する。
   必要になったら、生ログではなく蓄積済みの `~/.claude/nippo/*.md` を入力にすること。
@@ -245,6 +260,8 @@ multi_select が無ければ、タグは付けずに投稿する。アイコン�
 プロジェクトは cwd を git のトップレベルに畳んで数えている。**git worktree は別プロジェクト
 として並ぶ**（`<repo>` と `<repo>-wt-pr1234` のように別々の行になる）。同じリポジトリの
 作業だと分かる場合は、日報側で 1 つの見出しにまとめてよい。
+Cursor の transcript と metadata を突合できない場合は `cursor://<project>` という限定的な
+識別子になる。その場合、同じリポジトリだと digest だけから断定できないため推測で統合しない。
 
 ## 出自
 
