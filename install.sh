@@ -28,11 +28,19 @@ link_file "$DOTFILES_DIR/claude/subagent-statusline.sh" "$HOME/.claude/subagent-
 
 echo ""
 echo "------------------------------"
-echo "🧩 Claude Code / Cursor のグローバル skill をリンクします..."
+echo "🤖 Codex の運用ルールをリンクします..."
 echo "------------------------------"
-# skills/src を正本とし、Claude Code と Cursor の両方へ同じ skill を symlink する。
-# これにより両ツールで同一の skill を使い回せる（編集の正本は skills/src のみ）。
-mkdir -p "$HOME/.claude/skills" "$HOME/.cursor/skills"
+# Claude Code と Codex で運用ルールの正本を共有する。Codex は
+# ~/.codex/AGENTS.md をグローバル指示として読み込む。
+link_file "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"
+
+echo ""
+echo "------------------------------"
+echo "🧩 Claude Code / Cursor / Codex のグローバル skill をリンクします..."
+echo "------------------------------"
+# skills/src を正本とし、各エージェントへ同じ skill を symlink する。
+# これにより各ツールで同一の skill を使い回せる（編集の正本は skills/src のみ）。
+mkdir -p "$HOME/.claude/skills" "$HOME/.cursor/skills" "$HOME/.agents/skills"
 for skill_dir in "$DOTFILES_DIR"/skills/src/*/; do
   [ -d "$skill_dir" ] || continue
   skill_name="$(basename "$skill_dir")"
@@ -42,11 +50,13 @@ for skill_dir in "$DOTFILES_DIR"/skills/src/*/; do
   # 配置前に rm -rf する。ln -sfn は宛先が実ディレクトリの場合エラーにならず、
   # ディレクトリの「中」に symlink を作って入れ子（dest/name/name）を生やすため、
   # -n だけでは過去の cp 配置や前回の入れ子が残り続ける。
-  rm -rf "$HOME/.claude/skills/$skill_name" "$HOME/.cursor/skills/$skill_name"
+  rm -rf "$HOME/.claude/skills/$skill_name" "$HOME/.cursor/skills/$skill_name" "$HOME/.agents/skills/$skill_name"
   ln -sfn "$skill_dir" "$HOME/.claude/skills/$skill_name"
   ln -sfn "$skill_dir" "$HOME/.cursor/skills/$skill_name"
+  ln -sfn "$skill_dir" "$HOME/.agents/skills/$skill_name"
   echo "  ✅ $HOME/.claude/skills/$skill_name -> $skill_dir"
   echo "  ✅ $HOME/.cursor/skills/$skill_name -> $skill_dir"
+  echo "  ✅ $HOME/.agents/skills/$skill_name -> $skill_dir"
 done
 
 echo ""
@@ -157,7 +167,7 @@ echo "------------------------------"
 # その場合 symlink が解除され実ファイルに戻る。気づいたら ./install.sh を再実行する。
 link_file "$DOTFILES_DIR/gh/config.yml" "$HOME/.config/gh/config.yml"
 
-# tmux / vim / Gemini / Codex などは、設定ファイルを追加したタイミングで
+# tmux / vim / Gemini などは、設定ファイルを追加したタイミングで
 # この下に同様の `link_file` 呼び出しを追記していく運用を想定しています。
 # 例）tmux:
 # echo ""
@@ -196,4 +206,3 @@ fi
 
 echo ""
 echo "✅ セットアップ完了！"
-

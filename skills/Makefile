@@ -1,25 +1,27 @@
 .PHONY: list install
 
 SRC_DIR := src
+AGENT_DIRS := .cursor/skills .agents/skills
 
-# グローバル install（~/.claude/skills・~/.cursor/skills）は install.sh の symlink が
+# グローバル install（~/.claude/skills・~/.cursor/skills・~/.agents/skills）は install.sh の symlink が
 # 正本。ここに cp 版を残すと src の編集が反映されない配置が並存し、「直したのに
 # 変わらない」が起きる。他リポへの配布用途の install のみ残す。
 
 list:
 	@ls -1 "$(SRC_DIR)" | sed 's/\/$$//' || true
 
-# Install skills into target repo's .cursor/skills/
+# Install skills into target repo's .cursor/skills/ and .agents/skills/.
 # Usage: make -C skills install TARGET=/path/to/repo
 install:
 	@if [ -z "$(TARGET)" ]; then echo "TARGET is required. e.g. make -C skills install TARGET=.."; exit 2; fi
-	@mkdir -p "$(TARGET)/.cursor/skills"
-	@for d in "$(SRC_DIR)"/*; do \
-		if [ -d "$$d" ]; then \
-			name="$$(basename "$$d")"; \
-			mkdir -p "$(TARGET)/.cursor/skills/$$name"; \
-			cp -rf "$$d/." "$(TARGET)/.cursor/skills/$$name/"; \
-			echo "installed: $$name"; \
-		fi; \
+	@for agent_dir in $(AGENT_DIRS); do \
+		mkdir -p "$(TARGET)/$$agent_dir"; \
+		for d in "$(SRC_DIR)"/*; do \
+			if [ -d "$$d" ]; then \
+				name="$$(basename "$$d")"; \
+				mkdir -p "$(TARGET)/$$agent_dir/$$name"; \
+				cp -rf "$$d/." "$(TARGET)/$$agent_dir/$$name/"; \
+				echo "installed: $$agent_dir/$$name"; \
+			fi; \
+		done; \
 	done
-

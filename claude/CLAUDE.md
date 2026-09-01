@@ -1,4 +1,4 @@
-# Claude Code Global Settings
+# AI Agent Global Settings
 
 > このファイルは「常時効かせたい原則」だけを置く。言語別・技術別の詳細レビュー観点は
 > 該当スキル（`review-*` の `references/focus-blocks.md`）が正本。肥大化はルール遵守率を
