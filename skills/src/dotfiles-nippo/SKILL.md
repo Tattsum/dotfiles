@@ -67,7 +67,17 @@ skill-session-digest <YYYY-MM-DD> > ~/.claude/nippo/.digest-<YYYY-MM-DD>.json
 生成した JSON を `Read` する。**セッションログの JSONL や Cursor の SQLite を直接読むことは絶対にしない。**
 
 `meta.warnings` があれば、欠落したソースと継続して使えたソースを日報提示時に伝える。
-1ソースの欠落だけで日報生成を止めない。集約器が非0終了した場合だけ、利用可能なログが無いとして止める。
+1ソースの欠落だけで日報生成を止めない。`meta.source_stats[].records`（対象日に抽出できた
+観測件数・セッションタイトルは含まない）が 0 でも、その日そのエージェントを使っていない
+だけのことが多い。ただし「当日更新されたログはあるのに 0 件」の warning が出ている場合は、
+**ログ形式が変わって拾えていない可能性**なので日報にそのまま添え、統計を鵜呑みにしない。
+
+集約器の終了コードは意味が2つある。**混同すると異常を「記録なし」と誤報告する**ので分ける。
+
+- `exit 1`: 選択したソースがすべて利用不可（`no selected session log source is available`）。
+  利用可能なログが無いとして止める。
+- それ以外の非0（`exit 2` = 引数不正 / それ以外 = 異常終了）: 「記録がありません」ではなく
+  **集約器が失敗した**ことを、stderr の内容ごとユーザーに伝えて止める。
 
 `stats.prompts_kept` と `stats.tool_calls` が両方 0 なら、その日は記録が無い。
 日報を捏造せず「対象日の記録がありません」と伝えて終了する。
@@ -101,7 +111,7 @@ skill-session-digest <YYYY-MM-DD> > ~/.claude/nippo/.digest-<YYYY-MM-DD>.json
 
 ## 統計
 - プロンプト {kept} 件（除去前 {total}）／ツール {tool_calls} 回（上位 3 つ）／{projects} プロジェクト・{sessions} セッション
-- 稼働 HH〜HH 時。by_hour の山と谷を 1 行で（event 時刻を持つソースだけを対象）
+- 稼働 HH〜HH 時（`projects[].span`）。by_hour の山と谷を 1 行で（どちらも event 時刻のみ）
 
 ## 今日の学び
 （**最大 3 件・各 1 行**。digest の観測（時刻・回数・ファイル・エラー）に必ず紐づける。
@@ -127,6 +137,10 @@ Cursor は発話単位の timestamp を持たず、metadata と突合できれ�
 Cursor の時刻を時間帯の山・谷や正確な着手時刻の根拠に使わない。Cursor しか記録がない日は、
 時間帯統計を推測せず、`session` なら「セッション単位の時刻のみ」、`file` なら
 「ファイル更新日時ベースの低精度時刻のみ」と書く。
+
+稼働時間は `projects[].span`（event 精度のみ）を使う。粗い時刻は `span_low_precision` に
+分けてあり、**両者を足して稼働幅にしない**。`span.from` が `null` の日は event 精度の記録が
+無い日なので、稼働時間を書かずに `span_low_precision` の範囲を低精度と明記して添える。
 
 ## 4. 後片付けと提示
 

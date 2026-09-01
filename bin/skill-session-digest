@@ -117,6 +117,25 @@ add_source_stat() {
     >> "$SOURCE_STATS"
 }
 
+# records から `k == "a"`（セッションタイトル）を除くのは、タイトルが日付に依存せず
+# 全セッション分積まれるため。含めると対象日の記録が 0 件のソースでも records が非0に
+# なり（実測: 対象日外の Cursor セッション 200 件で records 200）、「集計できていない
+# ソース」の判定にこの数値を使えない。
+day_record_count() {
+  jq -s '[.[] | select(.k != "a")] | length' "$RECORDS"
+}
+
+# 対象日に更新されたログファイルの数。available なソースが 0 件だったとき、それが
+# 「その日は使っていない」なのか「形式が変わって拾えていない」なのかを分ける唯一の手掛かり。
+# 前者で毎日 warning を出すと、warnings 自体が読み飛ばされる。
+files_touched_on_day() {
+  local root="$1"
+  local pattern="$2"
+
+  command find "$root" -type f -name "$pattern" \
+    -newermt "$DAY 00:00:00" ! -newermt "$DAY 23:59:59" 2>/dev/null | wc -l | tr -d ' '
+}
+
 oldest_file_date() {
   local root="$1"
   local pattern="$2"
@@ -155,7 +174,7 @@ extract_claude() {
 
   files="$(command find "$CLAUDE_ROOT" -type f -name '*.jsonl' ! -name 'agent-*' | wc -l | tr -d ' ')"
   oldest="$(oldest_file_date "$CLAUDE_ROOT" '*.jsonl')"
-  before="$(wc -l < "$RECORDS" | tr -d ' ')"
+  before="$(day_record_count)"
 
   # `awk 1` を挟むのは末尾改行の無いファイル対策。複数ファイルを 1 つの jq プロセスに
   # 渡すと、末尾改行が無いファイルの最終行と次ファイルの先頭行が連結して 1 レコード
@@ -189,7 +208,7 @@ extract_claude() {
           else empty end
       ' >> "$RECORDS"
 
-  after="$(wc -l < "$RECORDS" | tr -d ' ')"
+  after="$(day_record_count)"
   add_source_stat "claude" "$CLAUDE_ROOT" "available" "$files" "$((after - before))" "event" "$oldest"
 }
 
@@ -244,7 +263,7 @@ cursor_metadata() {
 }
 
 extract_cursor() {
-  local files before after oldest metadata file sid meta epoch cwd title fallback_cwd precision unmatched
+  local files before after oldest metadata plan file sid epoch cwd title precision unmatched
 
   [ -d "$CURSOR_ROOT" ] || {
     add_warning "Cursor log root not found: $(short_path "$CURSOR_ROOT")"
@@ -254,42 +273,59 @@ extract_cursor() {
 
   files="$(command find "$CURSOR_ROOT" -type f -name '*.jsonl' -path '*/agent-transcripts/*' ! -path '*/subagents/*' | wc -l | tr -d ' ')"
   oldest="$(oldest_file_date "$CURSOR_ROOT" '*.jsonl')"
-  before="$(wc -l < "$RECORDS" | tr -d ' ')"
+  before="$(day_record_count)"
   metadata="$(mktemp -t skill-session-digest-cursor-meta)"
   cursor_metadata "$metadata"
   unmatched=0
 
-  while IFS= read -r -d '' file; do
-    sid="$(basename "$file" .jsonl)"
-    meta="$(jq -c --arg sid "$sid" '.[$sid] // empty' "$metadata")"
-    fallback_cwd="cursor://$(basename "$(dirname "$(dirname "$(dirname "$file")")")")"
+  # 対象日のセッションだけを 1 回の jq で選び出す。transcript ごとに jq / date /
+  # basename / dirname を起こす素直な書き方では、同じファイル数で Claude の約 7 倍
+  # かかった（実測 200 本で 4.10s 対 0.57s。Claude は全ファイルを 1 プロセスで流す）。
+  # 突合できない transcript の時刻はファイルの mtime なので、find -exec stat で
+  # まとめて取ってから metadata と突き合わせる。
+  # 区切りに @tsv ではなく \u001f を使うのは、@tsv がタブと改行をエスケープして出すため。
+  # パスにタブが含まれると、読み戻した側では元の文字に戻せない。
+  plan="$(mktemp -t skill-session-digest-cursor-plan)"
+  command find "$CURSOR_ROOT" -type f -name '*.jsonl' -path '*/agent-transcripts/*' \
+      ! -path '*/subagents/*' -exec stat -f '%m %N' {} + 2>/dev/null \
+    | jq -R -s -r --slurpfile metafile "$metadata" --argjson off "$OFFSET_SECONDS" --arg day "$DAY" '
+        ($metafile[0] // {}) as $metamap
+        | split("\n") | map(select(length > 0))
+        | map((index(" ")) as $sp
+              | {mtime: (.[0:$sp] | tonumber), path: .[$sp + 1:]}
+              | .sid = (.path | split("/") | last | sub("\\.jsonl$"; ""))
+              | ("cursor://" + (.path | split("/") | .[-4])) as $fallback
+              | ($metamap[.sid] // null) as $meta
+              | if $meta == null then
+                  . + {epoch: .mtime, cwd: $fallback, title: "", precision: "file"}
+                else
+                  . + {epoch: $meta.epoch, title: ($meta.title // ""), precision: "session",
+                       cwd: (if ($meta.cwd // "") == "" then $fallback else $meta.cwd end)}
+                end)
+        | map(select((.epoch + $off | strftime("%Y-%m-%d")) == $day))
+        | .[] | [(.epoch | tostring), .precision, .cwd, .title, .path] | join("\u001f")
+      ' > "$plan"
 
-    # 突合できた場合もセッション単位の 1 時刻しか無く、発話毎の時刻は復元できない。
-    # それらしい時刻を按分して埋めると Claude の event 時刻と区別が付かなくなるので、
-    # セッション時刻をそのまま全レコードに配り precision で区別する。
-    if [ -n "$meta" ]; then
-      epoch="$(jq -r '.epoch' <<< "$meta")"
-      cwd="$(jq -r '.cwd // ""' <<< "$meta")"
-      title="$(jq -r '.title // ""' <<< "$meta")"
-      precision="session"
-      [ -n "$cwd" ] || cwd="$fallback_cwd"
-    else
-      epoch="$(stat -f '%m' "$file")"
-      cwd="$fallback_cwd"
-      title=""
-      precision="file"
+  # 突合できた場合もセッション単位の 1 時刻しか無く、発話毎の時刻は復元できない。
+  # それらしい時刻を按分して埋めると Claude の event 時刻と区別が付かなくなるので、
+  # セッション時刻をそのまま全レコードに配り precision で区別する。
+  while IFS=$'\x1f' read -r epoch precision cwd title file; do
+    # unmatched は対象日のものだけ数える。警告は「この日の時刻が粗い」ことを伝えるもので、
+    # 過去の突合できないセッションまで数えると毎日同じ警告が出て読まれなくなる。
+    if [ "$precision" = "file" ]; then
       unmatched=$((unmatched + 1))
     fi
 
+    sid="${file##*/}"
+    sid="${sid%.jsonl}"
     jq -nc --arg sid "$sid" --arg title "$title" \
       '{k: "a", source: "cursor", sid: $sid, title: $title}' >> "$RECORDS"
 
     awk 1 "$file" \
-      | jq -c -R --argjson epoch "$epoch" --argjson off "$OFFSET_SECONDS" --arg day "$DAY" \
+      | jq -c -R --argjson epoch "$epoch" --argjson off "$OFFSET_SECONDS" \
           --arg cwd "$cwd" --arg sid "$sid" --arg precision "$precision" '
           def localpart($fmt): ($epoch + $off | strftime($fmt));
           fromjson? // empty
-          | select(($epoch + $off | strftime("%Y-%m-%d")) == $day)
           | if .role == "user" then
               (if (.message.content | type) == "string" then .message.content
                else [.message.content[]? | select(.type == "text") | .text // ""] | join("\n") end) as $text
@@ -303,13 +339,13 @@ extract_cursor() {
                  arg: (.input.command // .input.file_path // .input.skill // .input.pattern // "")}
             else empty end
         ' >> "$RECORDS"
-  done < <(command find "$CURSOR_ROOT" -type f -name '*.jsonl' -path '*/agent-transcripts/*' ! -path '*/subagents/*' -print0)
+  done < "$plan"
 
   if [ "$unmatched" -gt 0 ]; then
     add_warning "Cursor metadata did not match $unmatched transcript(s); file times were used"
   fi
-  rm -f "$metadata"
-  after="$(wc -l < "$RECORDS" | tr -d ' ')"
+  rm -f "$metadata" "$plan"
+  after="$(day_record_count)"
   add_source_stat "cursor" "$CURSOR_ROOT" "available" "$files" "$((after - before))" "session-or-file" "$oldest"
 }
 
@@ -324,7 +360,7 @@ extract_codex() {
 
   files="$(command find "$CODEX_ROOT" -type f -name 'rollout-*.jsonl' | wc -l | tr -d ' ')"
   oldest="$(oldest_file_date "$CODEX_ROOT" 'rollout-*.jsonl')"
-  before="$(wc -l < "$RECORDS" | tr -d ' ')"
+  before="$(day_record_count)"
 
   while IFS= read -r -d '' file; do
     awk 1 "$file" | jq -c -R 'fromjson? // empty' \
@@ -374,13 +410,27 @@ extract_codex() {
         ' >> "$RECORDS"
   done < <(command find "$CODEX_ROOT" -type f -name 'rollout-*.jsonl' -print0)
 
-  after="$(wc -l < "$RECORDS" | tr -d ' ')"
+  after="$(day_record_count)"
   add_source_stat "codex" "$CODEX_ROOT" "available" "$files" "$((after - before))" "event" "$oldest"
 }
 
 selected "claude" && extract_claude
 selected "cursor" && extract_cursor
 selected "codex" && extract_codex
+
+# ログはあるのに 1 件も拾えないソースを申告させる。各ソースの内部形式はこちらの管理外で、
+# 変わったときは黙って 0 件になる（実測: session_meta を持たない rollout は
+# status=available・records=0・warnings 空のまま落ちる）。ヘッダが避けようとしている
+# 「入力が沈黙したまま、それらしい出力が出る」劣化そのものなので、必ず表に出す。
+while IFS=$'\t' read -r source root pattern; do
+  [ "$(files_touched_on_day "$root" "$pattern")" -gt 0 ] || continue
+  add_warning "$source: $DAY に更新されたログはあるが 0 件しか抽出できなかった（形式変更の可能性）"
+done < <(jq -r --arg claude "$CLAUDE_ROOT" --arg cursor "$CURSOR_ROOT" --arg codex "$CODEX_ROOT" '
+  select(.status == "available" and .records == 0)
+  | [.source,
+     (if .source == "claude" then $claude elif .source == "cursor" then $cursor else $codex end),
+     (if .source == "codex" then "rollout-*.jsonl" else "*.jsonl" end)]
+  | @tsv' "$SOURCE_STATS")
 
 # 1 ソースの欠落では止めない。3 エージェントのうち使っていないものは日常的に存在し、
 # そこで exit すると「その日に本当に作業していない」場合と区別が付かなくなる。
@@ -483,9 +533,21 @@ jq -s \
             sessions: ([$project_prompts[], $project_tools[]]
                        | unique_by([.source, .sid])
                        | map({source, id: (.sid[0:8]), title: ($titles[.source + ":" + .sid] // "")})),
+            # span は event 精度のレコードだけから出す。session / file 精度の時刻を
+            # 混ぜると、Cursor のセッション 1 点が稼働の開始・終了として通ってしまい、
+            # precision を分けた意味が span で消える。粗い時刻は捨てず
+            # span_low_precision に分けて出し、日報側で扱いを変えられるようにする。
             span: {
-              from: ([$project_prompts[].time, $project_tools[].time] | min),
-              to: ([$project_prompts[].time, $project_tools[].time] | max)
+              from: ([$project_prompts[], $project_tools[]]
+                     | map(select(.precision == "event") | .time) | min),
+              to: ([$project_prompts[], $project_tools[]]
+                   | map(select(.precision == "event") | .time) | max)
+            },
+            span_low_precision: {
+              from: ([$project_prompts[], $project_tools[]]
+                     | map(select(.precision != "event") | .time) | min),
+              to: ([$project_prompts[], $project_tools[]]
+                   | map(select(.precision != "event") | .time) | max)
             },
             tools: ([$project_tools[].name] | group_by(.) | map({key: .[0], value: length})
                     | sort_by(-.value) | from_entries),

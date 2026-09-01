@@ -87,6 +87,12 @@ jq -e '
     "/Users/example/work/sample-project/cursor.txt"
   ]
   and ([.projects[0].prompts[].text] | sort) == ["Claude prompt", "Codex prompt", "Cursor prompt"]
+  and .projects[0].span == {"from": "09:00", "to": "09:32"}
+  and .projects[0].span_low_precision == {"from": "09:15", "to": "09:15"}
+  and ([.meta.source_stats[] | {source, records}] | sort_by(.source))
+      == [{"source": "claude", "records": 2},
+          {"source": "codex", "records": 3},
+          {"source": "cursor", "records": 2}]
 ' <<< "$output" >/dev/null
 
 codex_only="$($DIGEST 2026-09-01 --source codex --codex-root "$CODEX_ROOT")"
@@ -137,6 +143,37 @@ jq -e '
   and (.meta.warnings | any(contains("Cursor log root not found")))
   and .stats.prompts_kept == 2
 ' <<< "$partial" >/dev/null
+
+mkdir -p "$CODEX_ROOT/2026/08/15"
+command cat > "$CODEX_ROOT/2026/08/15/rollout-nometa.jsonl" <<'JSONL'
+{"timestamp":"2026-09-01T00:30:00.000Z","type":"event_msg","payload":{"type":"user_message","message":"orphan"}}
+JSONL
+touch -t 202609011200 "$CODEX_ROOT/2026/08/15/rollout-nometa.jsonl"
+silent="$($DIGEST 2026-09-01 --source codex --codex-root "$CODEX_ROOT/2026/08")"
+jq -e '
+  .stats.prompts_kept == 0
+  and (.meta.warnings | any(contains("0 件しか抽出できなかった")))
+' <<< "$silent" >/dev/null
+
+touch -t 202608151200 "$CODEX_ROOT/2026/08/15/rollout-nometa.jsonl"
+quiet="$($DIGEST 2026-09-01 --source codex --codex-root "$CODEX_ROOT/2026/08")"
+jq -e '.stats.prompts_kept == 0 and .meta.warnings == []' <<< "$quiet" >/dev/null
+
+off_day_cursor="$FIXTURE_ROOT/cursor-offday"
+mkdir -p "$off_day_cursor/sample/agent-transcripts/old-session"
+command cat > "$off_day_cursor/sample/agent-transcripts/old-session/old-session.jsonl" <<'JSONL'
+{"role":"user","message":{"content":[{"type":"text","text":"last month"}]}}
+JSONL
+touch -t 202608011000 "$off_day_cursor/sample/agent-transcripts/old-session/old-session.jsonl"
+off_day_out="$($DIGEST 2026-09-01 --source cursor \
+  --cursor-root "$off_day_cursor" --cursor-state-db "$FIXTURE_ROOT/missing-state.vscdb")"
+jq -e '
+  .stats.prompts_kept == 0
+  and .projects == []
+  and ([.meta.source_stats[].records] == [0])
+  and ((.meta.warnings | any(contains("0 件しか抽出できなかった"))) | not)
+  and ((.meta.warnings | any(contains("did not match"))) | not)
+' <<< "$off_day_out" >/dev/null
 
 if "$DIGEST" 2026-09-01 --source cursor --cursor-root "$FIXTURE_ROOT/missing-cursor" >/dev/null 2>&1; then
   echo "missing selected source should fail" >&2
