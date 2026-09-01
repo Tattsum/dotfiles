@@ -118,12 +118,24 @@ launchctl bootout gui/$(id -u)/<label>                       # 停止
 `classification-rules.json` は履歴の派生物で固有名詞を含み得るため、`~/.claude/prompt-patterns/` に
 置いたまま `.gitignore` で除外しています（このリポジトリは public です）。
 
-## Cursor / Skills（汎用テンプレ）
+## Claude Code / Cursor / Codex の運用ルールと Skills
+
+- 常時適用する運用ルールの正本は `claude/CLAUDE.md` です。
+  - Claude Code: `~/.claude/CLAUDE.md`
+  - Codex: `~/.codex/AGENTS.md`
+- Skills の正本は `skills/src/` です。`./install.sh` により次へ同じ内容を symlink します。
+  - `~/.claude/skills/`
+  - `~/.cursor/skills/`
+  - `~/.agents/skills/`（Codex）
+- このリポジトリ自身では、ルートの `AGENTS.md` が同じ運用ルールを Codex に適用します。
+
+### Cursor / Codex Skills（リポジトリ配布）
 
 - **汎用 `.cursorrules`**
   - `cursor/.cursorrules` を用意しています。
   - 各リポジトリに入れたい場合は、そのリポジトリ直下へコピーして使ってください。
 - **汎用 Skills**
-  - `skills/` 配下に Cursor Agent Skill の雛形を置いています。
+  - `skills/` 配下に共通 Agent Skill の雛形を置いています。
   - 任意のリポジトリへ展開する例:
     - `make -C skills install TARGET=/path/to/repo`
+  - `.cursor/skills/` と `.agents/skills/`（Codex）の両方へコピーされます。

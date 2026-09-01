@@ -1,11 +1,11 @@
 # skills（汎用）
 
-複数リポジトリで使い回せる **Cursor Agent Skill** の雛形です。
+複数リポジトリで使い回せる **Claude Code / Cursor / Codex Skill** の雛形です。
 
 ## 方針
 
 - **`src/<skill-id>/SKILL.md`** を編集の正本にする
-- 各リポジトリに展開する場合は、対象リポジトリ側の `.cursor/skills/<skill-id>/` にコピーする
+- 各リポジトリに展開する場合は、対象リポジトリ側の `.cursor/skills/<skill-id>/` と `.agents/skills/<skill-id>/` にコピーする
 - 機密情報（トークン等）は skill に含めない（必要なら環境変数名だけを書く）
 
 ## レイアウト
@@ -74,9 +74,8 @@ skills/
 ## コマンド
 
 - `make -C skills list`
-- `make -C skills install TARGET=<path-to-repo-root>` — 他リポジトリの `.cursor/skills/` へコピー
-- `./install.sh` — `~/.claude/skills/` と `~/.cursor/skills/` へ symlink（グローバル利用の正本）
+- `make -C skills install TARGET=<path-to-repo-root>` — 他リポジトリの `.cursor/skills/` と `.agents/skills/` へコピー
+- `./install.sh` — `~/.claude/skills/`、`~/.cursor/skills/`、`~/.agents/skills/` へ symlink（グローバル利用の正本）
 
 グローバル配置は symlink なので、`src/` を編集した時点で反映される。`skill-*` スクリプトも
 `install.sh` が `~/.local/bin/` へリンクするため、SKILL.md からはコマンド名で呼べる。
-
