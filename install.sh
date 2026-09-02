@@ -25,6 +25,7 @@ link_file "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_file "$DOTFILES_DIR/claude/settings.json" "$HOME/.claude/settings.json"
 link_file "$DOTFILES_DIR/claude/statusline.sh" "$HOME/.claude/statusline.sh"
 link_file "$DOTFILES_DIR/claude/subagent-statusline.sh" "$HOME/.claude/subagent-statusline.sh"
+link_file "$DOTFILES_DIR/claude/agents/Explore.md" "$HOME/.claude/agents/Explore.md"
 
 echo ""
 echo "------------------------------"

@@ -24,6 +24,10 @@
     "enabled": true
   },
   "advisorModel": "opus",
+  "autoCompactWindow": 200000,
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  },
   "autoMode": {
     "allow": [
       "$defaults",
