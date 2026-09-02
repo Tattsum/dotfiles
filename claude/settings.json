@@ -20,8 +20,16 @@
     "claude-code-setup@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true
   },
+  "sandbox": {
+    "enabled": true
+  },
   "advisorModel": "opus",
   "autoMode": {
+    "allow": [
+      "$defaults",
+      "Bash(fd:*)",
+      "Bash(bat:*)"
+    ],
     "environment": [
       "### Org-wide",
       "**Organization**: None configured",
@@ -47,14 +55,7 @@
       "**Trusted repo**: /Users/tatsuma.kano/.dotfiles and its remote github.com:Tattsum/dotfiles. Because that remote is PUBLIC, only this repo's own dotfiles work belongs there; content ported or first read from outside this session's repo does not. Secrets and personal data are never cleared into it by visibility.",
       "**Org-specific CLIs**: None configured — observed local tooling is modern-CLI replacements (fd, bat, rg, sd, dust, procs, zoxide) and zellij/helix/yazi",
       "**Routine actions**: local file reads and searches with `fd` and `bat` inside /Users/tatsuma.kano/.dotfiles; `install.sh` symlink runs into $HOME config paths"
-    ],
-    "allow": [
-      "$defaults",
-      "Bash(fd:*)",
-      "Bash(bat:*)"
     ]
   },
-  "sandbox": {
-    "enabled": true
-  }
+  "model": "claude-fable-5-1[1m]"
 }
