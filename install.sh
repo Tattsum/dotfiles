@@ -196,6 +196,14 @@ fi
 
 echo ""
 echo "------------------------------"
+echo "🧩 Codex の Atlassian MCP を設定します..."
+echo "------------------------------"
+if ! "$DOTFILES_DIR/bin/configure-codex-atlassian"; then
+  echo "  ⚠️ Atlassian MCP 設定は完了しませんでしたが、他のセットアップを続行します"
+fi
+
+echo ""
+echo "------------------------------"
 echo "🕒 launchd ジョブを登録します..."
 echo "------------------------------"
 # 失敗を許容する。bootstrap は disable 済み・二重ロードのいずれでも exit 5 を返し、
