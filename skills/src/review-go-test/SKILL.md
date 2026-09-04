@@ -1,6 +1,6 @@
 ---
 name: review-go-test
-description: Reviews Go backend diffs for test strategy, repository tests, integration tests, logic coverage, assertion quality, false negatives, boundary cases, and layer-appropriate verification. Use when the user asks for test review, test-quality review, coverage review, integration-test review, repository-test review, assertion review, or says 「テストをレビュー」「テスト品質チェック」「coverage 観点で見て」; reports findings only and never edits code.
+description: Reviews Go backend diffs for test strategy, repository tests, integration tests, logic coverage, assertion quality, false negatives, boundary cases, and layer-appropriate verification. Use when the user asks for test review, test-quality review, coverage review, integration-test review, repository-test review, assertion review, or says 「テストをレビュー」「テスト品質チェック」「coverage 観点で見て」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 

@@ -103,6 +103,7 @@ Jira 課題 / Confluence ページの **URL を渡された調査・確認・回
 - **Go バックエンド**: `dotfiles-go-review`（`review-go-architecture` / `-idioms` / `-storage` / `-test` / `-observability` / `-grpc`）
 - **PHP / Laravel**: `dotfiles-php-laravel-review`（`review-php-*`）
 - **TypeScript / Vue / Nuxt / React / Next**: `dotfiles-ts-review`（`review-ts-*`）
+- **IaC（Terraform / OpenTofu / jsonnet）**: `review-iac`（オーケストレーターは無く単体で完結）
 - **lint / test**: `dotfiles-lint-and-test` / `dotfiles-php-laravel-lint-test`
 - **セキュリティ・パフォーマンス横断**: `dotfiles-security-performance`
 

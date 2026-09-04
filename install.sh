@@ -60,6 +60,23 @@ for skill_dir in "$DOTFILES_DIR"/skills/src/*/; do
   echo "  ✅ $HOME/.agents/skills/$skill_name -> $skill_dir"
 done
 
+# 正本（skills/src）から削除された skill の symlink を掃除する。上のループは張り直すだけで
+# 消えた skill には触れないため、放置すると壊れた symlink を各エージェントが読み続ける。
+# symlink かつリンク先が skills/src 配下かつ実在しないものだけを対象にし、実ディレクトリ・
+# プラグイン由来の配置・他ツールが置いたものには触れない。
+for agent_skills_dir in "$HOME/.claude/skills" "$HOME/.cursor/skills" "$HOME/.agents/skills"; do
+  for entry in "$agent_skills_dir"/*; do
+    [ -L "$entry" ] || continue
+    case "$(readlink "$entry")" in
+      "$DOTFILES_DIR"/skills/src/*) ;;
+      *) continue ;;
+    esac
+    [ -e "$entry" ] && continue
+    rm -f "$entry"
+    echo "  🧹 $entry を削除（正本が存在しない）"
+  done
+done
+
 echo ""
 echo "------------------------------"
 echo "🐚 zsh の設定をリンクします..."

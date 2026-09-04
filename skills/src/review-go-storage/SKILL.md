@@ -1,6 +1,6 @@
 ---
 name: review-go-storage
-description: Reviews Go backend diffs for DB schema design, SQL query performance (indexes, N+1, filter pushdown, empty IN guards, cache, metered/billed external-call cost), and write-integrity/concurrency/external-I/O robustness (retry backoff, explicit locking over implicit gap locks, incremental persistence, queue ordering/idempotency, bulk atomicity, timing consistency, URL handling). Use when the user asks for DB design review, migration review, SQL performance review, persistence review, concurrency/locking review, external API robustness review, API cost/quota review, or says 「DBレビュー」「マイグレーション確認」「クエリ性能チェック」「排他制御を見て」; reports findings only and never edits code.
+description: Reviews Go backend diffs for DB schema design, SQL query performance (indexes, N+1, filter pushdown, empty IN guards, cache, metered/billed external-call cost), and write-integrity/concurrency/external-I/O robustness (retry backoff, explicit locking over implicit gap locks, incremental persistence, queue ordering/idempotency, bulk atomicity, timing consistency, URL handling). Use when the user asks for DB design review, migration review, SQL performance review, persistence review, concurrency/locking review, external API robustness review, API cost/quota review, or says 「DBレビュー」「マイグレーション確認」「クエリ性能チェック」「排他制御を見て」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 

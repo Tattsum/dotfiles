@@ -1,6 +1,6 @@
 ---
 name: review-ts-test
-description: Reviews TypeScript / Vue / Nuxt / React / Next frontend test diffs for test strategy (behavior over implementation, component testing with Testing Library / Vue Test Utils, what logic needs tests) and test quality (concrete assertions, boundary cases, proper async waiting, mocking only external dependencies, avoiding false negatives). Use when the user asks for frontend test review, component-test review, test-quality review, or says 「フロントのテストをレビュー」「テスト品質をチェック」「テスト戦略を見て」; reports findings only and never edits code.
+description: Reviews TypeScript / Vue / Nuxt / React / Next frontend test diffs for test strategy (behavior over implementation, component testing with Testing Library / Vue Test Utils, what logic needs tests) and test quality (concrete assertions, boundary cases, proper async waiting, mocking only external dependencies, avoiding false negatives). Use when the user asks for frontend test review, component-test review, test-quality review, or says 「フロントのテストをレビュー」「テスト品質をチェック」「テスト戦略を見て」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 

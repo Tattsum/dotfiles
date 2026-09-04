@@ -1,6 +1,6 @@
 ---
 name: review-go-grpc
-description: Reviews Go backend gRPC / Protobuf diffs for schema design, field-number and backward-compatibility risks, optional/repeated/map usage, status-code choice, error details, retryability, and API-boundary leakage. Use when the user asks for gRPC review, protobuf schema review, proto backward-compatibility review, status-code review, or says 「gRPC をレビュー」「proto のスキーマを見て」「後方互換チェック」; reports findings only and never edits code.
+description: Reviews Go backend gRPC / Protobuf diffs for schema design, field-number and backward-compatibility risks, optional/repeated/map usage, status-code choice, error details, retryability, and API-boundary leakage. Use when the user asks for gRPC review, protobuf schema review, proto backward-compatibility review, status-code review, or says 「gRPC をレビュー」「proto のスキーマを見て」「後方互換チェック」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: dotfiles-security-performance
-description: 設計・実装・レビューでセキュリティとパフォーマンスを重点的にチェックするとき。入力検証・認証認可・秘密情報の漏洩・N+1・メモリ/IO 効率を Must / Should / Nice to have で指摘する。
+description: 設計・実装・レビューでセキュリティとパフォーマンスを重点的にチェックするとき。入力検証・認証認可・秘密情報の漏洩・N+1・メモリ/IO 効率を Must / Should / Nice to have で指摘する。対象外: 言語別の詳細な観点は review-go-* / review-php-* / review-ts-* を使う。
 ---
 
 ## 目的

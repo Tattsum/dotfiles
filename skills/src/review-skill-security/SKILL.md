@@ -15,7 +15,7 @@ Install 前に Skill をセキュリティレビューする。**コードは修
   - 例: `./skills/src/my-skill/`
   - 例: `./SKILL.md`
 
-## Scope（対象）
+## Scope
 
 - SKILL.md（マニフェスト・説明文・トリガー定義）
 - Bash / Python / Shell スクリプト
