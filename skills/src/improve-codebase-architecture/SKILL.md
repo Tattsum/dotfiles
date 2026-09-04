@@ -72,7 +72,7 @@ This stays in the main context because it is an interactive back-and-forth with 
 
 Side effects happen inline as decisions crystallize, but **always ask the user before writing to any file**:
 
-- **Naming a deepened module after a concept not in `CONTEXT.md`?** Ask: _"Add '[term]' to CONTEXT.md? (y/n)"_ — only write if the user confirms. Same discipline as `/grill-with-docs` (see [CONTEXT-FORMAT.md](../grill-with-docs/CONTEXT-FORMAT.md)). Create the file lazily if it doesn't exist, again only after confirmation.
+- **Naming a deepened module after a concept not in `CONTEXT.md`?** Ask: _"Add '[term]' to CONTEXT.md? (y/n)"_ — only write if the user confirms. Create the file lazily if it doesn't exist, again only after confirmation.
 - **Sharpening a fuzzy term during the conversation?** Propose the update and show the diff — write only after user confirmation.
-- **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ — create the file only if the user accepts. Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing — skip ephemeral reasons ("not worth it right now") and self-evident ones. See [ADR-FORMAT.md](../grill-with-docs/ADR-FORMAT.md).
+- **User rejects the candidate with a load-bearing reason?** Offer an ADR, framed as: _"Want me to record this as an ADR so future architecture reviews don't re-suggest it?"_ — create the file only if the user accepts. Only offer when the reason would actually be needed by a future explorer to avoid re-suggesting the same thing — skip ephemeral reasons ("not worth it right now") and self-evident ones.
 - **Want to explore alternative interfaces for the deepened module?** See [INTERFACE-DESIGN.md](INTERFACE-DESIGN.md).

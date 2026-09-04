@@ -1,6 +1,6 @@
 ---
 name: review-ts-performance
-description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for render performance (unnecessary re-renders, memoization, stable keys/props) and load/compute cost (heavy work on the main thread, code splitting/lazy loading, bundle size, list virtualization). Use when the user asks for frontend performance review, re-render review, bundle/loading review, or says 「フロントの性能をレビュー」「再レンダリングを見て」「遅延読み込みをチェック」; reports findings only and never edits code.
+description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for render performance (unnecessary re-renders, memoization, stable keys/props) and load/compute cost (heavy work on the main thread, code splitting/lazy loading, bundle size, list virtualization). Use when the user asks for frontend performance review, re-render review, bundle/loading review, or says 「フロントの性能をレビュー」「再レンダリングを見て」「遅延読み込みをチェック」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 

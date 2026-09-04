@@ -1,6 +1,6 @@
 ---
 name: review-iac
-description: Reviews Infrastructure-as-Code diffs (Terraform / OpenTofu `.tf`/`.tfvars`/`.hcl`, and jsonnet/libsonnet config such as ecspresso) for module boundaries and lifecycle separation (splitting resources with different create/update/destroy cadences, isolating out-of-band bootstrap steps, count/for_each apply-time dependencies, explicit depends_on), naming/convention consistency (module, resource, environment, and subdomain naming, unused declarations, operational outputs), and security/operational signals (least-privilege IAM scoping, explicit security-relevant defaults, alarm-metric correctness). Use when the user asks for Terraform review, IaC review, module-structure review, IAM least-privilege review, or says 「IaC をレビュー」「Terraform の差分を見て」「module 構成を見て」「IAM 権限を見て」; reports findings only and never edits code.
+description: Reviews Infrastructure-as-Code diffs (Terraform / OpenTofu `.tf`/`.tfvars`/`.hcl`, and jsonnet/libsonnet config such as ecspresso) for module boundaries and lifecycle separation (splitting resources with different create/update/destroy cadences, isolating out-of-band bootstrap steps, count/for_each apply-time dependencies, explicit depends_on), naming/convention consistency (module, resource, environment, and subdomain naming, unused declarations, operational outputs), and security/operational signals (least-privilege IAM scoping, explicit security-relevant defaults, alarm-metric correctness). Use when the user asks for Terraform review, IaC review, module-structure review, IAM least-privilege review, or says 「IaC をレビュー」「Terraform の差分を見て」「module 構成を見て」「IAM 権限を見て」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
@@ -85,5 +85,21 @@ After all three subagents return:
 3. Merge only findings with the same file, same line, and the same verbatim focus heading. If a subagent paraphrased its heading, re-derive it from the focus block instead of merging on the paraphrase.
 4. Print `合計N件 → 重複統合M件 → リストN-M件`; explain any mismatch.
 5. Output a numbered list and then include each finding detail from the subagent output.
+6. 重要度別に分類して出力する。IaC 用のオーケストレーターは無く、このスキルが単体で最終出力を担うため、
+   分類まで行う（`review-go-*` 等は `dotfiles-go-review` が分類するのでここは非対称でよい）。
+
+```
+## 🔴 Must（必ず修正）
+- [ファイル:行] 問題の説明 → 修正案
+
+## 🟡 Should（できれば修正）
+- [ファイル:行] 問題の説明 → 修正案
+
+## 🟢 Nice to have（提案）
+- [ファイル:行] 提案内容
+```
+
+分類の基準: **Must** = 権限過剰・本番影響・apply が壊れる（count/for_each の apply 時依存、破壊的な lifecycle）。
+**Should** = 命名・module 境界・未使用宣言など保守性。**Nice** = 表現の一貫性・将来の改善余地。
 
 If all three subagents return no findings, say `IaC のモジュール境界・命名規約・セキュリティ/運用シグナルの観点では指摘はありません`.

@@ -1,6 +1,6 @@
 ---
 name: review-ts-state
-description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for state management scope (Redux/Zustand/Pinia/Vuex vs local state, derived state duplication) and effects/async (useEffect/watcher dependency arrays, cleanup, race conditions, fetch error/loading handling). Use when the user asks for state-management review, effects/hooks review, async data review, or says 「状態管理をレビュー」「useEffect の依存を見て」「非同期処理をチェック」; reports findings only and never edits code.
+description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for state management scope (Redux/Zustand/Pinia/Vuex vs local state, derived state duplication) and effects/async (useEffect/watcher dependency arrays, cleanup, race conditions, fetch error/loading handling). Use when the user asks for state-management review, effects/hooks review, async data review, or says 「状態管理をレビュー」「useEffect の依存を見て」「非同期処理をチェック」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 

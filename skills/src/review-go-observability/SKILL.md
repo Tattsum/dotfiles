@@ -1,6 +1,6 @@
 ---
 name: review-go-observability
-description: Reviews Go backend diffs for observability (logging and investigability)—structured log context, logging of failures/empty results, error wrapping vs. duplicated logging, secret exposure in logs, and log-level consistency. Use when the user asks for logging review, observability review, investigability review, or says 「ログ観点でレビュー」「観測性チェック」「調査可能性を見て」; reports findings only and never edits code.
+description: Reviews Go backend diffs for observability (logging and investigability)—structured log context, logging of failures/empty results, error wrapping vs. duplicated logging, secret exposure in logs, and log-level consistency. Use when the user asks for logging review, observability review, investigability review, or says 「ログ観点でレビュー」「観測性チェック」「調査可能性を見て」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 

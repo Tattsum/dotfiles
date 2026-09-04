@@ -1,6 +1,6 @@
 ---
 name: review-ts-architecture
-description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for component responsibility, Container/Presentational separation, prop bloat, prop drilling, and logic extraction into composables/hooks. Use when the user asks for frontend architecture review, component-design review, or says 「フロントの設計をレビュー」「コンポーネント責務を見て」「Props 肥大化チェック」; reports findings only and never edits code.
+description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for component responsibility, Container/Presentational separation, prop bloat, prop drilling, and logic extraction into composables/hooks. Use when the user asks for frontend architecture review, component-design review, or says 「フロントの設計をレビュー」「コンポーネント責務を見て」「Props 肥大化チェック」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 

@@ -1,6 +1,6 @@
 ---
 name: review-ts-security
-description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for XSS/output safety (v-html, dangerouslySetInnerHTML, javascript: URLs) and authorization/input validation/secret handling (per-route authorization and privilege-lockout guards, SSRF on user-supplied URLs, reserved-word/downstream-corrupting input, client+server validation, CSRF, secrets in the client bundle, sensitive data in storage). Use when the user asks for frontend security review, XSS review, input-validation review, or says 「フロントのセキュリティをレビュー」「XSS をチェック」「入力検証を見て」; reports findings only and never edits code.
+description: Reviews TypeScript / Vue / Nuxt / React / Next frontend diffs for XSS/output safety (v-html, dangerouslySetInnerHTML, javascript: URLs) and authorization/input validation/secret handling (per-route authorization and privilege-lockout guards, SSRF on user-supplied URLs, reserved-word/downstream-corrupting input, client+server validation, CSRF, secrets in the client bundle, sensitive data in storage). Use when the user asks for frontend security review, XSS review, input-validation review, or says 「フロントのセキュリティをレビュー」「XSS をチェック」「入力検証を見て」.
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
