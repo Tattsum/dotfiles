@@ -1,0 +1,59 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+MCP_NAME="Atlassian"
+MCP_URL="https://mcp.atlassian.com/v1/mcp"
+
+if ! command -v codex >/dev/null 2>&1; then
+  echo "  ⏭ Codex CLI が見つからないため Atlassian MCP 設定をスキップ"
+  exit 0
+fi
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "  ⚠️ jq が見つからないため Atlassian MCP 設定を確認できません" >&2
+  exit 1
+fi
+
+if ! current_config="$(codex mcp get "$MCP_NAME" --json 2>/dev/null)"; then
+  if ! codex mcp list >/dev/null 2>&1; then
+    echo "  ⚠️ Codex MCP 設定を読み取れません" >&2
+    exit 1
+  fi
+
+  echo "  🔐 Atlassian MCP を登録して OAuth 認証を開始します..."
+  if codex mcp add "$MCP_NAME" --url "$MCP_URL"; then
+    exit 0
+  fi
+
+  if codex mcp get "$MCP_NAME" >/dev/null 2>&1; then
+    echo "  ⚠️ MCP 登録は保存されましたが OAuth 認証が完了していません" >&2
+    echo "     codex mcp login $MCP_NAME" >&2
+  else
+    echo "  ⚠️ Atlassian MCP を登録できませんでした" >&2
+  fi
+  exit 1
+fi
+
+if jq -e --arg expected_url "$MCP_URL" '
+  .enabled == true
+  and .transport.type == "streamable_http"
+  and .transport.url == $expected_url
+  and .transport.bearer_token_env_var == null
+  and ((.transport.http_headers // {}) | length == 0)
+  and ((.transport.env_http_headers // {}) | length == 0)
+  and .transport.http_headers_helper == null
+' >/dev/null <<<"$current_config"; then
+  echo "  ✅ Atlassian MCP は設定済みです"
+  exit 0
+fi
+
+echo "  ⚠️ Atlassian MCP の既存設定が dotfiles の期待値と異なるため、上書きしません" >&2
+jq -r '
+  "     enabled=\(.enabled)",
+  "     transport=\(.transport.type)",
+  "     url=\(.transport.url)",
+  "     custom_auth=\((.transport.bearer_token_env_var != null) or ((.transport.http_headers // {}) | length > 0) or ((.transport.env_http_headers // {}) | length > 0) or (.transport.http_headers_helper != null))"
+' <<<"$current_config" >&2
+echo "     expected_url=$MCP_URL" >&2
+exit 1

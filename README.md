@@ -129,6 +129,23 @@ launchctl bootout gui/$(id -u)/<label>                       # 停止
   - `~/.agents/skills/`（Codex）
 - このリポジトリ自身では、ルートの `AGENTS.md` が同じ運用ルールを Codex に適用します。
 
+### Codex の Atlassian MCP
+
+`./install.sh` は Codex のユーザー設定に Atlassian MCP
+`https://mcp.atlassian.com/v1/mcp` を登録します。初回登録時は Codex CLI が
+OAuth 認証を開始します。
+
+OAuth の期限切れや初回認証の中断後は、次のコマンドで再認証します。
+
+```sh
+codex mcp login Atlassian
+```
+
+OAuth 資格情報や `~/.codex/config.toml` 全体は dotfiles で管理しません。
+Codex が追加するプラグイン設定、端末固有パス、project trust と分離するためです。
+Claude Code の claude.ai コネクタ認証と Codex の MCP OAuth 認証は別管理のため、
+どちらか一方で認証してももう一方には反映されません。
+
 ### Cursor / Codex Skills（リポジトリ配布）
 
 - **汎用 `.cursorrules`**
