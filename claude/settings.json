@@ -1,4 +1,7 @@
 {
+  "env": {
+    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
+  },
   "permissions": {
     "allow": [
       "Bash(git rev-list:*)",
@@ -6,6 +9,7 @@
       "WebFetch(domain:play.google.com)"
     ]
   },
+  "model": "opus[1m]",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -24,10 +28,6 @@
     "enabled": true
   },
   "advisorModel": "opus",
-  "autoCompactWindow": 200000,
-  "env": {
-    "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet"
-  },
   "autoMode": {
     "allow": [
       "$defaults",
@@ -60,6 +60,5 @@
       "**Org-specific CLIs**: None configured — observed local tooling is modern-CLI replacements (fd, bat, rg, sd, dust, procs, zoxide) and zellij/helix/yazi",
       "**Routine actions**: local file reads and searches with `fd` and `bat` inside /Users/tatsuma.kano/.dotfiles; `install.sh` symlink runs into $HOME config paths"
     ]
-  },
-  "model": "claude-fable-5-1[1m]"
+  }
 }
