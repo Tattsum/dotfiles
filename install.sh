@@ -133,6 +133,31 @@ link_file "$DOTFILES_DIR/bin/skill-review-state" "$HOME/.local/bin/skill-review-
 link_file "$DOTFILES_DIR/bin/skill-session-digest" "$HOME/.local/bin/skill-session-digest"
 link_file "$DOTFILES_DIR/bin/skill-nippo-notion-post" "$HOME/.local/bin/skill-nippo-notion-post"
 
+# 日報投稿の認証情報の置き場所。repo には雛形も置かず、ここで生成する。link_file で
+# 配ると symlink 経由で public repo 側に実物が入りうるため、リンクではなく実ファイル。
+NIPPO_ENV_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/nippo/env"
+if [ -e "$NIPPO_ENV_FILE" ]; then
+  # 「触らない」だけを出すと、雛形のまま値が空でも毎回同じ表示になり気づけない。値の有無だけ
+  # 見て（中身は出さない）未設定なら促す。grep の結果は表示せず、判定にのみ使う。
+  if grep -qE '^[[:space:]]*(export[[:space:]]+)?NIPPO_NOTION_TOKEN[[:space:]]*=[[:space:]]*[^[:space:]]' "$NIPPO_ENV_FILE"; then
+    echo "  ⏭  $NIPPO_ENV_FILE は既にあるので触りません"
+  else
+    echo "  ⚠️ $NIPPO_ENV_FILE はまだ値が空です（日報の Notion 投稿は exit 2 になります）"
+  fi
+else
+  mkdir -p "$(dirname "$NIPPO_ENV_FILE")"
+  # 先に 600 で作ってから書く。umask 次第で一瞬 644 の実体が存在するのを避ける。
+  (umask 177 && cat > "$NIPPO_ENV_FILE" <<'NIPPO_ENV'
+# skill-nippo-notion-post の認証情報。環境変数が優先で、このファイルは fallback。
+# ~/.zshrc.local は対話 zsh でしか読まれないため、codex・cron・launchd から呼ぶ場合は
+# こちらに置く。値を埋めたら chmod 600 のままにすること。
+NIPPO_NOTION_TOKEN=
+NIPPO_NOTION_DATABASE_ID=
+NIPPO_ENV
+  )
+  echo "  ✅ $NIPPO_ENV_FILE を作成しました（値は手で埋めてください）"
+fi
+
 echo ""
 echo "------------------------------"
 echo "🕒 launchd ジョブのスクリプトをリンクします..."

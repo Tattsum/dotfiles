@@ -195,7 +195,8 @@ skill-nippo-notion-post ~/.claude/nippo/<YYYY-MM-DD>.md \
 exit 3 は「その日付のページが既にある」で、URL だけ出して何もしていない状態。
 上書き手段は用意していないので、必要なら Notion 側で人間が手を入れる。
 
-exit 2 は環境変数が未設定。下の「初回セットアップ」を案内する（初回はここに落ちる）。
+exit 2 は認証情報が未設定。下の「初回セットアップ」を案内する（初回はここに落ちる）。
+エラーメッセージが読み込み先のパスを出すので、それをそのまま示す。
 
 失敗したら、返ってきた HTTP status と message をそのまま伝える。404 は
 **integration が対象 DB に共有されていない**のが最頻の原因。
@@ -206,12 +207,19 @@ exit 2 は環境変数が未設定。下の「初回セットアップ」を案�
 
 ## 初回セットアップ（未設定のときだけ案内する）
 
-`~/.zshrc.local` に以下を置く。**dotfiles リポジトリには絶対に置かない**（public repo）。
+`~/.config/nippo/env` に以下を置く（`install.sh` が空の雛形を 600 で作る）。
+**dotfiles リポジトリには絶対に置かない**（public repo）。
 
-```bash
-export NIPPO_NOTION_TOKEN='ntn_...'
-export NIPPO_NOTION_DATABASE_ID='<投稿先 DB の ID>'
 ```
+NIPPO_NOTION_TOKEN=ntn_...
+NIPPO_NOTION_DATABASE_ID=<投稿先 DB の ID>
+```
+
+環境変数が優先で、このファイルは未設定分の fallback。`~/.zshrc.local` に置く形も動くが、
+そちらは `.zshrc` から source されるため**対話 zsh でしか読まれない**。Codex から呼ばれる場合は
+`shell_environment_policy` の既定 exclude（`*KEY*` / `*SECRET*` / `*TOKEN*`）で
+`NIPPO_NOTION_TOKEN` が子プロセスに渡らないため、env 経由では届かない。cron / launchd でも
+同様に読まれないので、**投稿モードの正本はこのファイルにする**。
 
 token は https://www.notion.so/profile/integrations で internal integration を作って発行する。
 発行後、**対象の DB をフルページで開き `⋯` → Connections でその integration を追加する**。
@@ -252,6 +260,9 @@ multi_select が無ければ、タグは付けずに投稿する。アイコン�
 - **token を Bash コマンドに直書きしない。** このスキルの入力はセッションログ自身なので、
   コマンド列に載せた token は翌日の digest に入り、Notion へ投稿されうる（再帰ハザード）。
   環境変数名でしか触らない。ユーザーが token を会話に貼ろうとしたら止める。
+- **`~/.config/nippo/env` の中身を表示しない。** `cat` / `bat` / `grep` で開くと token が
+  そのままセッションログに残り、上と同じ経路で翌日の digest に入る。存在確認は `test -f` まで、
+  設定漏れの切り分けはスクリプトのエラーメッセージ（読み込み先のパスを出す）で足りる。
 - **Notion へ送るのは日報 md だけ。** digest JSON は送らない。
 - **生成モードで投稿しない。** 投稿は別の呼び出し。
 

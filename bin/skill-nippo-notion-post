@@ -44,6 +44,10 @@
 #   NIPPO_NOTION_TAG          付与する multi_select タグ（既定: 仕事のこと）
 #   NIPPO_NOTION_ICON         --icon 省略時のアイコン（既定: 📝）
 #
+#   未設定の変数は ${XDG_CONFIG_HOME:-~/.config}/nippo/env（KEY=VALUE・chmod 600）から補う。
+#   環境変数が優先で、ファイルは fallback。codex・cron・launchd のような非対話の呼び出しでは
+#   ~/.zshrc.local が読まれないため、そちらだけに置くと届かない。
+#
 # Exit:
 #   0  作成した / --dry-run が通った
 #   3  同じ日付のページが既にある（URL を出して何もしない）
@@ -54,6 +58,31 @@ set -euo pipefail
 
 API="https://api.notion.com/v1"
 VERSION="2026-03-11"
+
+# 環境変数だけに頼れないので、未設定分は設定ファイルから補う。~/.zshrc.local は .zshrc から
+# source されるため対話 zsh でしか読まれず、codex・cron・launchd から呼ばれた時点で最初から
+# 見えない。加えて codex は shell_environment_policy の既定 exclude（*KEY* / *SECRET* /
+# *TOKEN*）で NIPPO_NOTION_TOKEN を子プロセスへ渡さないため、値を env に置けても届かない。
+# どちらも呼び出し側のシェルを直しても塞げず、後者を塞ぐには codex の既定を緩めることになる。
+#
+# 読み込みに source を使わないのは、認証情報の置き場所に任意のシェルコードを実行させないため。
+# 対象キーも決め打ちにして、設定ファイルから未知の変数が生えないようにする。
+NIPPO_ENV_FILE="${XDG_CONFIG_HOME:-$HOME/.config}/nippo/env"
+if [ -f "$NIPPO_ENV_FILE" ]; then
+  perms="$(stat -f '%OLp' "$NIPPO_ENV_FILE" 2>/dev/null || stat -c '%a' "$NIPPO_ENV_FILE" 2>/dev/null || echo "")"
+  case "$perms" in
+    ""|600|400) ;;
+    *) echo "警告: $NIPPO_ENV_FILE の権限が $perms です。chmod 600 を推奨します" >&2 ;;
+  esac
+  for key in NIPPO_NOTION_TOKEN NIPPO_NOTION_DATABASE_ID NIPPO_NOTION_TAG NIPPO_NOTION_ICON; do
+    eval "current=\${$key:-}"
+    [ -n "$current" ] && continue
+    value="$(sed -n "s/^[[:space:]]*\(export[[:space:]]\{1,\}\)\{0,1\}${key}[[:space:]]*=[[:space:]]*//p" \
+      "$NIPPO_ENV_FILE" | tail -n 1 | sed -e 's/^"\(.*\)"$/\1/' -e "s/^'\(.*\)'\$/\1/")"
+    [ -n "$value" ] && eval "$key=\$value"
+  done
+fi
+
 TAG="${NIPPO_NOTION_TAG:-仕事のこと}"
 ICON="${NIPPO_NOTION_ICON:-📝}"
 FILE=""
@@ -76,8 +105,8 @@ done
 
 [ -n "$FILE" ] || { echo "markdown ファイルを指定してください" >&2; exit 2; }
 [ -f "$FILE" ] || { echo "ファイルがありません: $FILE" >&2; exit 2; }
-[ -n "${NIPPO_NOTION_TOKEN:-}" ] || { echo "NIPPO_NOTION_TOKEN が未設定です（~/.zshrc.local）" >&2; exit 2; }
-[ -n "${NIPPO_NOTION_DATABASE_ID:-}" ] || { echo "NIPPO_NOTION_DATABASE_ID が未設定です（~/.zshrc.local）" >&2; exit 2; }
+[ -n "${NIPPO_NOTION_TOKEN:-}" ] || { echo "NIPPO_NOTION_TOKEN が未設定です（環境変数、または ${NIPPO_ENV_FILE}）" >&2; exit 2; }
+[ -n "${NIPPO_NOTION_DATABASE_ID:-}" ] || { echo "NIPPO_NOTION_DATABASE_ID が未設定です（環境変数、または ${NIPPO_ENV_FILE}）" >&2; exit 2; }
 
 if [ -z "$DAY" ]; then
   DAY="$(basename "$FILE" .md)"
@@ -152,7 +181,13 @@ if [ "$(printf '%s' "$FOUND" | jq '.results | length')" != "0" ]; then
   exit 3
 fi
 
-BODY="$(jq -n \
+# 整形した JSON を送ってはならない。`jq -n` の既定は整形出力だが、それだと Notion の前段の
+# Cloudflare が 403（Attention Required）で落とすことがある。実測した日報 1 本で、同一内容・
+# 同一ヘッダのまま pretty=403 / compact=通過が 3/3 で再現した。ただし短い body や同サイズの
+# ダミー文字列は pretty でも通ったので、「改行があれば必ず落ちる」ではなく本文と整形の
+# 組み合わせで踏む。踏んだ側の条件を消せるのは compact 化なので、そこだけ塞ぐ。
+# 一般の HTTP クライアントが送るのも compact 側で、`-c` は本来の既定に寄せる変更にあたる。
+BODY="$(jq -cn \
   --arg ds "$DS_ID" \
   --arg title_prop "$TITLE_PROP" \
   --arg date_prop "$DATE_PROP" \
