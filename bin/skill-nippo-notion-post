@@ -152,7 +152,13 @@ if [ "$(printf '%s' "$FOUND" | jq '.results | length')" != "0" ]; then
   exit 3
 fi
 
-BODY="$(jq -n \
+# 整形した JSON を送ってはならない。`jq -n` の既定は整形出力だが、それだと Notion の前段の
+# Cloudflare が 403（Attention Required）で落とすことがある。実測した日報 1 本で、同一内容・
+# 同一ヘッダのまま pretty=403 / compact=通過が 3/3 で再現した。ただし短い body や同サイズの
+# ダミー文字列は pretty でも通ったので、「改行があれば必ず落ちる」ではなく本文と整形の
+# 組み合わせで踏む。踏んだ側の条件を消せるのは compact 化なので、そこだけ塞ぐ。
+# 一般の HTTP クライアントが送るのも compact 側で、`-c` は本来の既定に寄せる変更にあたる。
+BODY="$(jq -cn \
   --arg ds "$DS_ID" \
   --arg title_prop "$TITLE_PROP" \
   --arg date_prop "$DATE_PROP" \
