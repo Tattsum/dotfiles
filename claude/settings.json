@@ -25,7 +25,18 @@
     "swift-lsp@claude-plugins-official": true
   },
   "sandbox": {
-    "enabled": true
+    "enabled": true,
+    "filesystem": {
+      "allowWrite": [
+        "~/Library/Caches/go-build",
+        "~/go/pkg/mod",
+        "~/go/bin",
+        "~/Library/Caches/golangci-lint",
+        "~/.cache/golangci-lint",
+        "~/.cargo/registry",
+        "~/.npm/_cacache"
+      ]
+    }
   },
   "advisorModel": "opus",
   "autoMode": {
