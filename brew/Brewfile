@@ -169,6 +169,8 @@ brew "tree"
 brew "ttyd"
 # Validating, recursive, caching DNS resolver
 brew "unbound"
+# Extremely fast Python package and project manager (runs PEP 723 scripts)
+brew "uv"
 # Vi 'workalike' with many additional features
 brew "vim"
 # Internet file retriever
