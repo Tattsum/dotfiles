@@ -34,7 +34,14 @@
         "~/Library/Caches/golangci-lint",
         "~/.cache/golangci-lint",
         "~/.cargo/registry",
-        "~/.npm/_cacache"
+        "~/.npm/_cacache",
+        "~/.cache/uv"
+      ]
+    },
+    "network": {
+      "allowedDomains": [
+        "pypi.org",
+        "files.pythonhosted.org"
       ]
     }
   },

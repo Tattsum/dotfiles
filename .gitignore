@@ -9,3 +9,6 @@ claude/prompt-patterns/classification-rules.json*
 claude/prompt-patterns/report-latest.md*
 claude/prompt-patterns/*.log
 claude/prompt-patterns/*.bak-*
+
+# natural-japanese の lint を uv run すると skills/src/*/scripts/ にバイトコードが生成される。
+__pycache__/
