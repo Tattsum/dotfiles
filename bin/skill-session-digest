@@ -89,9 +89,16 @@ TZ_NAME="$(date +%Z)"
 TZ_OFFSET="$(date +%z)"
 OFFSET_SECONDS=$(( ${TZ_OFFSET:0:1}1 * ( 10#${TZ_OFFSET:1:2} * 3600 + 10#${TZ_OFFSET:3:2} * 60 ) ))
 
-RECORDS="$(mktemp -t skill-session-digest-records)"
-SOURCE_STATS="$(mktemp -t skill-session-digest-stats)"
-WARNINGS="$(mktemp -t skill-session-digest-warnings)"
+# `mktemp -t` は使わない。macOS の mktemp は -t 指定時に TMPDIR を無視して
+# /var/folders/.../T/ に作るため、Claude Code のサンドボックス（書き込み可能なのは TMPDIR 側）
+# では Operation not permitted で集約が始まらない（実測 2026-09-24）。
+make_temp() {
+  mktemp "${TMPDIR:-/tmp}/skill-session-digest-$1.XXXXXX"
+}
+
+RECORDS="$(make_temp records)"
+SOURCE_STATS="$(make_temp stats)"
+WARNINGS="$(make_temp warnings)"
 trap 'rm -f "$RECORDS" "$SOURCE_STATS" "$WARNINGS"' EXIT
 
 short_path() {
@@ -232,7 +239,7 @@ cursor_metadata() {
     return
   fi
 
-  rows="$(mktemp -t skill-session-digest-cursor-rows)"
+  rows="$(make_temp cursor-rows)"
   if ! sqlite3 -readonly -json "$CURSOR_STATE_DB" \
       'SELECT composerId, createdAt, lastUpdatedAt, value FROM composerHeaders WHERE COALESCE(isSubagent, 0) = 0;' \
       > "$rows" 2>/dev/null; then
@@ -279,7 +286,7 @@ extract_cursor() {
   files="$(command find "$CURSOR_ROOT" -type f -name '*.jsonl' -path '*/agent-transcripts/*' ! -path '*/subagents/*' | wc -l | tr -d ' ')"
   oldest="$(oldest_file_date "$CURSOR_ROOT" '*.jsonl')"
   before="$(day_record_count)"
-  metadata="$(mktemp -t skill-session-digest-cursor-meta)"
+  metadata="$(make_temp cursor-meta)"
   cursor_metadata "$metadata"
   unmatched=0
 
@@ -290,7 +297,7 @@ extract_cursor() {
   # まとめて取ってから metadata と突き合わせる。
   # 区切りに @tsv ではなく \u001f を使うのは、@tsv がタブと改行をエスケープして出すため。
   # パスにタブが含まれると、読み戻した側では元の文字に戻せない。
-  plan="$(mktemp -t skill-session-digest-cursor-plan)"
+  plan="$(make_temp cursor-plan)"
   command find "$CURSOR_ROOT" -type f -name '*.jsonl' -path '*/agent-transcripts/*' \
       ! -path '*/subagents/*' -exec stat -f '%m %N' {} + 2>/dev/null \
     | jq -R -s -r --slurpfile metafile "$metadata" --argjson off "$OFFSET_SECONDS" --arg day "$DAY" '
@@ -380,8 +387,8 @@ extract_codex() {
   files="$(command find "$CODEX_ROOT" -type f -name 'rollout-*.jsonl' | wc -l | tr -d ' ')"
   oldest="$(oldest_file_date "$CODEX_ROOT" 'rollout-*.jsonl')"
   before="$(day_record_count)"
-  rows="$(mktemp -t skill-session-digest-codex-rows)"
-  extracted="$(mktemp -t skill-session-digest-codex-extracted)"
+  rows="$(make_temp codex-rows)"
+  extracted="$(make_temp codex-extracted)"
   mute_files=0
 
   # 新旧の rollout 形式を別関数に分けないのは、session_meta の親子判定・時刻・cwd の
