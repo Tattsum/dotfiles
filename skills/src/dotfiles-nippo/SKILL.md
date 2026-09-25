@@ -41,7 +41,9 @@ Claude Code / Cursor / Codex のセッションログを日報にする。**ツ�
   - 必要な場合だけ `--source claude|cursor|codex|all` で絞る
 - Notion への投稿: `skill-nippo-notion-post`（`bin/skill-nippo-notion-post` が正本）
 - 出力先: `~/.claude/nippo/YYYY-MM-DD.md`
-- 中間ファイル: `~/.claude/nippo/.digest-YYYY-MM-DD.json`（生成後に削除する）
+- 中間ファイル: `$TMPDIR/nippo-digest-YYYY-MM-DD.json`（生成後に削除する）。
+  `~/.claude/nippo/` には置かない: sandbox はここへの Bash 書き込みを許可しておらず、
+  日報本体は `Write` ツール経由なので書けても、リダイレクトは `operation not permitted` で落ちる
 
 集約と HTTP はどちらも決定的処理なのでスクリプトに閉じ込め、モデルは**要約・言語化だけ**を担当する。
 1 日分の生ログは実測 900KB 超あり、そのまま読むとコンテキストに乗らない。
@@ -58,9 +60,10 @@ Claude Code / Cursor / Codex のセッションログを日報にする。**ツ�
 ## 2. digest を作って読む
 
 ```bash
-mkdir -p ~/.claude/nippo
-skill-session-digest <YYYY-MM-DD> > ~/.claude/nippo/.digest-<YYYY-MM-DD>.json
+skill-session-digest <YYYY-MM-DD> > "$TMPDIR/nippo-digest-<YYYY-MM-DD>.json" && echo "$TMPDIR"
 ```
+
+`Read` は環境変数を展開しないので、echo で出た実パスを使って読む。
 
 特定プロジェクトだけに絞る指示があれば `--project <部分一致>` を付ける。
 特定エージェントだけに絞る指示があれば `--source <claude|cursor|codex>` を付ける。
@@ -146,7 +149,7 @@ Cursor の時刻を時間帯の山・谷や正確な着手時刻の根拠に使�
 
 ## 4. 後片付けと提示
 
-`.digest-<日付>.json` を `rm -f` で消し、日報のパスと本文を提示する。
+`"$TMPDIR/nippo-digest-<日付>.json"` を `rm -f` で消し、日報のパスと本文を提示する。
 Notion への投稿は**この時点では行わない**。空欄を埋めたうえで改めて指示するよう一言添える。
 
 ---
