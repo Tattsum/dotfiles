@@ -26,6 +26,10 @@
   },
   "sandbox": {
     "enabled": true,
+    "excludedCommands": [
+      "gh *",
+      "git push *"
+    ],
     "filesystem": {
       "allowWrite": [
         "~/Library/Caches/go-build",
@@ -39,9 +43,12 @@
       ]
     },
     "network": {
+      "allowLocalBinding": true,
       "allowedDomains": [
         "pypi.org",
-        "files.pythonhosted.org"
+        "files.pythonhosted.org",
+        "registry.npmjs.org",
+        "api.osv.dev"
       ]
     }
   },
