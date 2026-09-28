@@ -48,7 +48,8 @@
         "pypi.org",
         "files.pythonhosted.org",
         "registry.npmjs.org",
-        "api.osv.dev"
+        "api.osv.dev",
+        "api.notion.com"
       ]
     }
   },
