@@ -23,7 +23,7 @@ Out of scope:
 - component responsibility and structure: use `review-ts-architecture`
 - type safety and naming: use `review-ts-idioms`
 - state management and effects: use `review-ts-state`
-- XSS and input validation: use `review-ts-security`
+- XSS and input validation: use `review-web-security`
 - tests: use `review-ts-test`
 
 ## Workflow

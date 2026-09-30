@@ -8,7 +8,7 @@ allowed-tools: [Bash, Read, Grep, Glob, Agent]
 
 PHP / Laravel の `<base>...HEAD` 差分を、6観点を focus 単位に細分した複数のサブエージェントへ並列に分担させてレビューし、統合した指摘リストを出す**オーケストレーター**。レビューのみ行い、ファイルは編集しない。
 
-個別観点だけ見たい場合は、各観点スキル（`review-php-architecture` / `review-php-idioms` / `review-php-storage` / `review-php-test` / `review-php-security` / `review-php-observability`）を直接呼ぶこともできる。
+個別観点だけ見たい場合は、各観点スキル（`review-php-architecture` / `review-php-idioms` / `review-php-storage` / `review-php-test` / `review-web-security` / `review-php-observability`）を直接呼ぶこともできる。セキュリティ観点は言語横断の `review-web-security` の focus を読み込む。
 
 ## Input
 
@@ -32,11 +32,13 @@ skill-resolve-diff --base <base> -- '*.php' '*.blade.php' 'database/migrations/*
 ~/.claude/skills/review-php-idioms/references/focus-blocks.md
 ~/.claude/skills/review-php-storage/references/focus-blocks.md
 ~/.claude/skills/review-php-test/references/focus-blocks.md
-~/.claude/skills/review-php-security/references/focus-blocks.md
+~/.claude/skills/review-web-security/references/focus-blocks.md
 ~/.claude/skills/review-php-observability/references/focus-blocks.md
 ```
 
-   **6ファイルすべてが読めなければ停止する（fail closed）**。読めなかったファイル名を挙げ、`./install.sh` を実行して skill を再配置するよう伝えて終了する。一部だけで続行しない: 「その観点で指摘が0件だった」と「その観点をそもそも実行していない」が出力上区別できず、同じ PR を再レビューしたときに前回の指摘が理由なく消えるため。
+   あわせて、security 担当が読む `~/.claude/skills/review-web-security/references/output-discipline.md` と `~/.claude/skills/review-web-security/references/sinks-php.md` が読めることを `test -r` で確認する（本文はサブエージェントが読むので、ここでは Read しない）。配備・サプライチェーン用の `focus-blocks-supply-chain.md` は読み込まない（Dockerfile や CI は `review-web-security --scope=supply-chain` の担当）。
+
+   **上記 8 ファイル（focus-block 6 ＋ security 用の参照 2）のどれか一つでも読めなければ停止する（fail closed）**。読めなかったファイル名を挙げ、`./install.sh` を実行して skill を再配置するよう伝えて終了する。一部だけで続行しない: 「その観点で指摘が0件だった」と「その観点をそもそも実行していない」が出力上区別できず、同じ PR を再レビューしたときに前回の指摘が理由なく消えるため。
 
 6. 各ファイル内の `## Focus ...` ブロックが1サブエージェント分の担当範囲。**読み込めた focus block を実際に数え、その数だけ** `general-purpose` サブエージェントを**1つのアシスタントメッセージ内で一斉に並列起動**する。1サブエージェント＝1 focus block。逐次実行やインラインレビューで代替しない。件数はここに書かず必ず数えること（ハードコードすると focus 追加時にドリフトする）。Agent が使えない場合は、本スキルはユーザーセッションから直接起動する必要がある旨を伝えて終了。
 7. 全サブエージェントの完了を待つ。
@@ -44,7 +46,7 @@ skill-resolve-diff --base <base> -- '*.php' '*.blade.php' 'database/migrations/*
 
 ## Subagent Prompt Shape
 
-各サブエージェントには、下記の共有コンテキストと 1 つの focus block を渡す。`<OWNER>` には観点名（architecture / idioms / storage / test / security / observability）を入れる。
+各サブエージェントには、下記の共有コンテキストと 1 つの focus block を渡す。`<OWNER>` には観点名（architecture / idioms / storage / test / security / observability）を入れる。security 担当には、共有プロンプトの末尾に次の指示を足す: 「最初に `~/.claude/skills/review-web-security/references/output-discipline.md` と `~/.claude/skills/review-web-security/references/sinks-php.md` を Read すること。出力は output-discipline.md の出力フォーマット（Source→Sink と重要度案を足し、最後に「確認できなかった範囲」を付ける）に従い、共有プロンプトの出力フォーマットと「該当なし」の書き方よりこちらを優先する。focus block の「誤検知の注意」に当たるものは報告しない。」
 
 ```text
 あなたは PHP / Laravel コードレビュー（観点: <OWNER>）の1名のレビュー担当です。レビューのみ行い、ファイルは編集しないでください。
@@ -131,4 +133,6 @@ skill-resolve-diff --base <base> -- '*.php' '*.blade.php' 'database/migrations/*
 - [path:line] (観点) 提案
 ```
 
-全観点で指摘がなかった場合は `全観点で PHP / Laravel レビューの指摘はありません` と明記する。
+   security の指摘は、サブエージェントの `重要度案` をそのまま重要度に使う（根拠が `output-discipline.md` の軸に沿っていない場合だけ調整し、調整した旨と理由を注記する）。詳細には Source→Sink を併記する。security 担当の「確認できなかった範囲」は重複を除き、詳細の最後に `## 🔍 確認できなかった範囲（security）` としてまとめる。
+
+全観点で指摘がなかった場合は `全観点で PHP / Laravel レビューの指摘はありません` と明記する（security の「確認できなかった範囲」があれば併記する）。

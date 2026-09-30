@@ -24,11 +24,18 @@ skills/
     ├── dotfiles-lint-and-test/SKILL.md         # リポジトリ標準の lint / format / test を特定して実行
     ├── dotfiles-conflict-resolve/SKILL.md      # git コンフリクトを安全に解消（操作種別判定→退避線→解消→検証、add まで）
     ├── dotfiles-php-laravel-lint-test/SKILL.md # PHP/Laravel の lint / 静的解析 / test を実行
-    ├── dotfiles-security-performance/SKILL.md  # セキュリティ + パフォーマンスを Must/Should/Nice で指摘（言語横断）
+    ├── dotfiles-security-performance/SKILL.md  # 設計・実装時の軽量チェック（セキュリティは3つの問い＋原則、詳細は review-web-security）+ パフォーマンス
     ├── dotfiles-review-and-act/SKILL.md        # PR レビュー → 所有者で分岐（自分=改修 / 他人=インライン投稿）
-    ├── dotfiles-go-review/SKILL.md             # Go レビューのオーケストレーター（6観点=15サブエージェントを並列起動）
-    ├── dotfiles-php-laravel-review/SKILL.md    # PHP/Laravel レビューのオーケストレーター（6観点=14サブエージェントを並列起動）
-    ├── dotfiles-ts-review/SKILL.md             # TS/Vue/React レビューのオーケストレーター（6観点=14サブエージェントを並列起動）
+    ├── dotfiles-go-review/SKILL.md             # Go レビューのオーケストレーター（7観点=23サブエージェントを並列起動）
+    ├── dotfiles-php-laravel-review/SKILL.md    # PHP/Laravel レビューのオーケストレーター（6観点=20サブエージェントを並列起動）
+    ├── dotfiles-ts-review/SKILL.md             # TS/Vue/React レビューのオーケストレーター（6観点=20サブエージェントを並列起動）
+    ├── review-web-security/                    # Web セキュリティ（言語横断・書籍準拠）。3オーケストレーターの security 観点の正本
+    │   ├── SKILL.md
+    │   └── references/
+    │       ├── focus-blocks.md                 # コード用 8 focus（インジェクション〜情報露出・ログ・本番設定）
+    │       ├── focus-blocks-supply-chain.md    # 配備・サプライチェーン（Dockerfile / CI / lock があるときだけ起動）
+    │       ├── output-discipline.md            # Source→Sink・確認できなかった範囲・重要度案の出力規律
+    │       └── sinks-go.md / sinks-php.md / sinks-ts.md  # 言語別 Sink 表
     ├── review-go-architecture/                 # Go: アーキテクチャ / レイヤー責務（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
@@ -59,9 +66,6 @@ skills/
     ├── review-php-test/                        # PHP: テスト命名・構造 / 品質（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── review-php-security/                    # PHP: インジェクション / 認可 / 機微情報（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
     ├── review-php-observability/               # PHP: ログ / 観測性 / 調査可能性（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
@@ -75,9 +79,6 @@ skills/
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
     ├── review-ts-performance/                  # TS: 再レンダリング / ロード・計算コスト（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-ts-security/                     # TS: XSS / 認可・入力検証 / 秘密情報（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
     ├── review-ts-test/                         # TS: テスト戦略 / テスト品質（単体観点）

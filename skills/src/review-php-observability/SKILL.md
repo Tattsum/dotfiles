@@ -20,7 +20,7 @@ In scope:
 
 Out of scope:
 - code edits
-- 秘匿値のマスク方針・認可・入力検証などのセキュリティ全般: `review-php-security` を使う
+- 秘匿値のマスク方針・認可・入力検証などのセキュリティ全般: `review-web-security` を使う
 - レイヤー責務・命名・DB・テスト: 各専用スキルを使う
 
 ## Workflow

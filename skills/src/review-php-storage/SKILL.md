@@ -20,7 +20,7 @@ In scope:
 
 Out of scope:
 - code edits
-- SQL インジェクション等のセキュリティ: use `review-php-security`
+- SQL インジェクション等のセキュリティ: use `review-web-security`
 - レイヤー責務・トランザクション: use `review-php-architecture`
 - 命名・型安全: use `review-php-idioms`
 - テスト: use `review-php-test`
