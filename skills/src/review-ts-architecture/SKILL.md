@@ -23,7 +23,7 @@ Out of scope:
 - type safety and naming: use `review-ts-idioms`
 - state management and effects: use `review-ts-state`
 - rendering/load performance: use `review-ts-performance`
-- XSS and input validation: use `review-ts-security`
+- XSS and input validation: use `review-web-security`
 - tests: use `review-ts-test`
 
 ## Workflow

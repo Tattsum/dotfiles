@@ -11,7 +11,7 @@ PR をレビューし、**所有者で次アクションを振り分ける**エ�
 - **自分の PR** → コメント投稿はしない。指摘に沿って**改修**する（Must は自動修正、Should/Nice は提案して確認）。commit/push は `dotfiles-commit-push` へ委譲。
 - **他人の PR** → コード編集はしない。指摘を **PJ ルール**（下記「コメント投稿手順」）で**インライン投稿**する。
 
-レビューそのものは再実装せず、言語別オーケストレーター（`dotfiles-go-review` / `dotfiles-php-laravel-review` / `dotfiles-ts-review`）へ委譲する。このスキルの責務は「所有者判定 → PR コンテキスト収集 → レビュー委譲 → 仕様適合チェック → 振り分け実行」に限る。差分ローカルの正しさ（型・N+1・命名…）は言語別レビューアが、仕様（Why）との適合はこのスキル自身が1回だけ判定する。
+レビューそのものは再実装せず、言語別オーケストレーター（`dotfiles-go-review` / `dotfiles-php-laravel-review` / `dotfiles-ts-review`）と、配備・サプライチェーンの `review-web-security --scope=supply-chain` へ委譲する。このスキルの責務は「所有者判定 → PR コンテキスト収集 → レビュー委譲 → 仕様適合チェック → 振り分け実行」に限る。差分ローカルの正しさ（型・N+1・命名…）は言語別レビューアが、仕様（Why）との適合はこのスキル自身が1回だけ判定する。
 
 ## Input
 
@@ -109,6 +109,8 @@ skill-resolve-diff --base <base>
 - `languages` に `go`（`*.go` / `*.sql` / `*.proto`）→ `dotfiles-go-review`
 - `languages` に `php`（`*.php`）→ `dotfiles-php-laravel-review`
 - `languages` に `ts`（`*.ts` / `*.tsx` / `*.vue` / `*.js` / `*.jsx`）→ `dotfiles-ts-review`
+
+言語の判定とは別に、`review-web-security --scope=supply-chain` を毎回起動する。Dockerfile・compose・CI workflow・依存の manifest / lock は言語別オーケストレーターの拡張子フィルタを通らないため、配備・サプライチェーンの focus はここから起動しないと PR レビューで一度も動かない。対象ファイルの判定は `review-web-security` 側だけに持たせ（パターンをここへ複製しない）、対象が無ければ同スキルが `focus I は未実行` と返して即終了する。その出力も `<FINDINGS>` に含める。
 
 いずれの言語にも当たらない場合は、CLAUDE.md「基本観点」（レイヤー境界 / エラー処理 / 命名・可読性 / テスト / セキュリティ / パフォーマンス）でインラインレビューする。委譲先の出力（Must / Should / Nice の重要度別指摘リスト）を `<FINDINGS>` として保持する。
 
@@ -215,7 +217,7 @@ skill-review-state <owner/repo> <pr番号>
 
 ## 委譲境界
 
-- **レビュー**: `dotfiles-go-review` / `dotfiles-php-laravel-review` / `dotfiles-ts-review`（指摘のみ・投稿しない設計）。
+- **レビュー**: `dotfiles-go-review` / `dotfiles-php-laravel-review` / `dotfiles-ts-review`、配備・サプライチェーンは `review-web-security --scope=supply-chain`（いずれも指摘のみ・投稿しない設計）。
 - **commit / push**: `dotfiles-commit-push`（このスキルは行わない）。
 - **PR 作成**: `dotfiles-pr-create`。
 - **コンフリクト解消**: `dotfiles-conflict-resolve`。

@@ -24,7 +24,7 @@ Out of scope:
 - レイヤー責務・トランザクション・クラス構成: use `review-php-architecture`
 - DB スキーマ・クエリ性能・N+1: use `review-php-storage`
 - テスト: use `review-php-test`
-- セキュリティ: use `review-php-security`
+- セキュリティ: use `review-web-security`
 
 ## Workflow
 

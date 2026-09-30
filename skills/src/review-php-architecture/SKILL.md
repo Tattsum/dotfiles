@@ -24,7 +24,7 @@ Out of scope:
 - 命名・型安全・PHP イディオム: use `review-php-idioms`
 - DB スキーマ・クエリ性能・N+1: use `review-php-storage`
 - テスト: use `review-php-test`
-- セキュリティ（SQLi・マスアサインメント・認可・XSS）: use `review-php-security`
+- セキュリティ（SQLi・マスアサインメント・認可・XSS）: use `review-web-security`
 
 ## Workflow
 

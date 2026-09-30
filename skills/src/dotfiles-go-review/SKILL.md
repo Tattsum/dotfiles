@@ -1,14 +1,14 @@
 ---
 name: dotfiles-go-review
-description: Go バックエンドの差分を、6観点（アーキテクチャ・イディオム/型安全・DB/永続化・テスト・観測性・gRPC/Protobuf）の専任サブエージェントに分担させて並列レビューし、統合した重要度別の指摘リストを報告するオーケストレーター。コードは修正しない。「Go のレビューして」「Go の差分を見て」「Go をまとめてレビュー」「6観点まとめて」等で発動。個別観点だけ見たいなら review-go-* を直接呼ぶ。
+description: Go バックエンドの差分を、7観点（アーキテクチャ・イディオム/型安全・DB/永続化・テスト・観測性・gRPC/Protobuf・セキュリティ）の専任サブエージェントに分担させて並列レビューし、統合した重要度別の指摘リストを報告するオーケストレーター。コードは修正しない。「Go のレビューして」「Go の差分を見て」「Go をまとめてレビュー」「7観点まとめて」等で発動。個別観点だけ見たいなら review-go-* を、セキュリティだけなら review-web-security を直接呼ぶ。
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
 # /dotfiles-go-review
 
-Go バックエンドの `<base>...HEAD` 差分を、6観点を focus 単位に細分した複数のサブエージェントへ並列に分担させてレビューし、統合した指摘リストを出す**オーケストレーター**。レビューのみ行い、ファイルは編集しない。
+Go バックエンドの `<base>...HEAD` 差分を、7観点を focus 単位に細分した複数のサブエージェントへ並列に分担させてレビューし、統合した指摘リストを出す**オーケストレーター**。レビューのみ行い、ファイルは編集しない。
 
-- 個別観点だけ見たい場合は、各観点スキル（`review-go-architecture` / `review-go-idioms` / `review-go-storage` / `review-go-test` / `review-go-observability` / `review-go-grpc`）を直接呼ぶ。
+- 個別観点だけ見たい場合は、各観点スキル（`review-go-architecture` / `review-go-idioms` / `review-go-storage` / `review-go-test` / `review-go-observability` / `review-go-grpc` / `review-web-security`）を直接呼ぶ。
 - Agent（サブエージェント）が使えない環境では、このスキルはユーザーセッションから直接起動する必要がある（インラインの単発レビューでは代替しない）。
 
 ## Input
@@ -26,7 +26,7 @@ skill-resolve-diff --base <base> -- '*.go' '*.sql' '*.proto'
 2. base ブランチが解決できなければ `ブランチ <base> が見つかりません` と伝えて終了。
 3. 変更ファイルがなければ `レビュー対象の変更がありません` と伝えて終了。
 4. `files` を `<TARGET_FILES>`、`diff` を `<DIFF_CONTEXT>` として保持する。`truncated` が true のときは `truncated_files` を `<TRUNCATED_FILES>` として保持し、全サブエージェントに渡したうえで、切り詰めが起きた事実と落ちたファイル一覧をユーザーに報告する。黙って落とさない: 切断位置は commit が増えるたびに動くため、同じ PR でも実行ごとにレビュー範囲が変わる。
-5. 6観点ぶんの focus-block 定義を読み込む。各観点スキルの `references/focus-blocks.md` を Read する:
+5. 7観点ぶんの focus-block 定義を読み込む。各観点スキルの `references/focus-blocks.md` を Read する:
 
 ```
 ~/.claude/skills/review-go-architecture/references/focus-blocks.md
@@ -35,9 +35,12 @@ skill-resolve-diff --base <base> -- '*.go' '*.sql' '*.proto'
 ~/.claude/skills/review-go-test/references/focus-blocks.md
 ~/.claude/skills/review-go-observability/references/focus-blocks.md
 ~/.claude/skills/review-go-grpc/references/focus-blocks.md
+~/.claude/skills/review-web-security/references/focus-blocks.md
 ```
 
-   **6ファイルすべてが読めなければ停止する（fail closed）**。読めなかったファイル名を挙げ、`./install.sh` を実行して skill を再配置するよう伝えて終了する。一部だけで続行しない: 「その観点で指摘が0件だった」と「その観点をそもそも実行していない」が出力上区別できず、同じ PR を再レビューしたときに前回の指摘が理由なく消えるため。
+   あわせて、security 担当が読む `~/.claude/skills/review-web-security/references/output-discipline.md` と `~/.claude/skills/review-web-security/references/sinks-go.md` が読めることを `test -r` で確認する（本文はサブエージェントが読むので、ここでは Read しない）。配備・サプライチェーン用の `focus-blocks-supply-chain.md` は読み込まない（Dockerfile や CI は `review-web-security --scope=supply-chain` の担当）。
+
+   **上記 9 ファイル（focus-block 7 ＋ security 用の参照 2）のどれか一つでも読めなければ停止する（fail closed）**。読めなかったファイル名を挙げ、`./install.sh` を実行して skill を再配置するよう伝えて終了する。一部だけで続行しない: 「その観点で指摘が0件だった」と「その観点をそもそも実行していない」が出力上区別できず、同じ PR を再レビューしたときに前回の指摘が理由なく消えるため。
 
 6. 各ファイル内の `## Focus ...` ブロックが1サブエージェント分の担当範囲。**読み込めた focus block を実際に数え、その数だけ** `general-purpose` サブエージェントを**1つのアシスタントメッセージ内で一斉に並列起動**する。1サブエージェント＝1 focus block。逐次実行やインラインレビューで代替しない。件数はここに書かず必ず数えること（ハードコードすると focus 追加時にドリフトする）。Agent が使えない場合は、本スキルはユーザーセッションから直接起動する必要がある旨を伝えて終了。
 7. 全サブエージェントの完了を待つ。
@@ -45,7 +48,7 @@ skill-resolve-diff --base <base> -- '*.go' '*.sql' '*.proto'
 
 ## Subagent Prompt Shape
 
-各サブエージェントには、下記の共有コンテキストと 1 つの focus block を渡す。`<OWNER>` には観点名（architecture / idioms / storage / test / observability / grpc）を入れる。storage 担当には差分に含まれる `.sql` ファイルも、grpc 担当には `.proto` ファイルも対象である旨を伝える。
+各サブエージェントには、下記の共有コンテキストと 1 つの focus block を渡す。`<OWNER>` には観点名（architecture / idioms / storage / test / observability / grpc / security）を入れる。storage 担当には差分に含まれる `.sql` ファイルも、grpc 担当には `.proto` ファイルも対象である旨を伝える。security 担当には、共有プロンプトの末尾に次の指示を足す: 「最初に `~/.claude/skills/review-web-security/references/output-discipline.md` と `~/.claude/skills/review-web-security/references/sinks-go.md` を Read すること。出力は output-discipline.md の出力フォーマット（Source→Sink と重要度案を足し、最後に「確認できなかった範囲」を付ける）に従い、共有プロンプトの出力フォーマットと「該当なし」の書き方よりこちらを優先する。focus block の「誤検知の注意」に当たるものは報告しない。」
 
 ```text
 あなたは Go バックエンドコードレビュー（観点: <OWNER>）の1名のレビュー担当です。レビューのみ行い、ファイルは編集しないでください。
@@ -101,7 +104,7 @@ skill-resolve-diff --base <base> -- '*.go' '*.sql' '*.proto'
 1. 観点（OWNER）ごとに指摘件数をカウントする。横断チェックの所見も観点 `横断` としてカウントに含める。
 2. 各指摘が `<TARGET_FILES>` 内のファイルを参照しているか検証し、対象外は警告付きで分離する。
 3. 統合は「同一ファイル・同一行・同一の focus 見出し（逐語一致）」の場合のみ行い、統合時は元の観点名を併記する。サブエージェントが見出しを言い換えていた場合は、言い換えのまま統合せず focus block の見出しに引き直す。
-4. `観点別カウント: architecture: N件, idioms: N件, storage: N件, test: N件, observability: N件, grpc: N件, 横断: N件 (合計N件) → 重複統合M件 → リストN-M件` を出力し、差分があれば原因を明記する。
+4. `観点別カウント: architecture: N件, idioms: N件, storage: N件, test: N件, observability: N件, grpc: N件, security: N件, 横断: N件 (合計N件) → 重複統合M件 → リストN-M件` を出力し、差分があれば原因を明記する。
 5. まず観点 × 重要度のサマリー表を出力する。各セルは件数。観点に指摘がなければ `0` を入れる。
 
 ```markdown
@@ -115,6 +118,7 @@ skill-resolve-diff --base <base> -- '*.go' '*.sql' '*.proto'
 | test         | 0 | 0 | 0 | 0 |
 | observability | 0 | 0 | 0 | 0 |
 | grpc         | 0 | 0 | 0 | 0 |
+| security     | 0 | 0 | 0 | 0 |
 | 横断         | 0 | 0 | 0 | 0 |
 | **合計**     | 0 | 0 | 0 | 0 |
 ```
@@ -132,4 +136,6 @@ skill-resolve-diff --base <base> -- '*.go' '*.sql' '*.proto'
 - [path:line] (観点) 提案
 ```
 
-全観点で指摘がなかった場合は `全観点で Go レビューの指摘はありません` と明記する。
+   security の指摘は、サブエージェントの `重要度案` をそのまま重要度に使う（根拠が `output-discipline.md` の軸に沿っていない場合だけ調整し、調整した旨と理由を注記する）。詳細には Source→Sink を併記する。security 担当の「確認できなかった範囲」は重複を除き、詳細の最後に `## 🔍 確認できなかった範囲（security）` としてまとめる。
+
+全観点で指摘がなかった場合は `全観点で Go レビューの指摘はありません` と明記する（security の「確認できなかった範囲」があれば併記する）。
