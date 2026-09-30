@@ -26,10 +26,16 @@
   },
   "sandbox": {
     "enabled": true,
-    "excludedCommands": [
-      "gh *",
-      "git push *"
-    ],
+    "network": {
+      "allowedDomains": [
+        "pypi.org",
+        "files.pythonhosted.org",
+        "registry.npmjs.org",
+        "api.osv.dev",
+        "api.notion.com"
+      ],
+      "allowLocalBinding": true
+    },
     "filesystem": {
       "allowWrite": [
         "~/Library/Caches/go-build",
@@ -42,16 +48,10 @@
         "~/.cache/uv"
       ]
     },
-    "network": {
-      "allowLocalBinding": true,
-      "allowedDomains": [
-        "pypi.org",
-        "files.pythonhosted.org",
-        "registry.npmjs.org",
-        "api.osv.dev",
-        "api.notion.com"
-      ]
-    }
+    "excludedCommands": [
+      "gh *",
+      "git push *"
+    ]
   },
   "advisorModel": "opus",
   "autoMode": {
@@ -86,5 +86,10 @@
       "**Org-specific CLIs**: None configured — observed local tooling is modern-CLI replacements (fd, bat, rg, sd, dust, procs, zoxide) and zellij/helix/yazi",
       "**Routine actions**: local file reads and searches with `fd` and `bat` inside /Users/tatsuma.kano/.dotfiles; `install.sh` symlink runs into $HOME config paths"
     ]
+  },
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "xhigh"
+    }
   }
 }
