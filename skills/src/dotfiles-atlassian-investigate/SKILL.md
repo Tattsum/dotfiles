@@ -126,10 +126,13 @@ git worktree list   # 別 worktree を指定された場合
 
 - **既定は現在ブランチ**。ユーザーがブランチ名 / worktree を指定していればそれを使う。
 - 現在ブランチと `<TICKET_CONTEXT>` の「本文中に出現したコード手がかり」が食い違う場合（別リポジトリ名・別ブランチ名が本文にある等）は、**推測で乗り換えず**どちらを見るかユーザーに確認する。
-- **fallback（既定経路が空振りしたときだけ）**: チケットキーからの逆引き。
+- **fallback（既定経路が空振りしたときだけ）**: チケットキーからの逆引き。次の2つは**それぞれ単独の Bash 呼び出し**で実行する（並列可。1つにまとめると sandbox の `gh *` 除外が効かず TLS 検証で失敗する）。
 
   ```bash
   gh pr list --search "<KEY>" --state all --json number,title,headRefName
+  ```
+
+  ```bash
   git log --all --grep="<KEY>" --oneline
   ```
 

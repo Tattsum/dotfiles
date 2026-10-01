@@ -37,10 +37,17 @@ allowed-tools: [Bash, Read, Grep, Glob, Agent, WebSearch, WebFetch, Skill, Write
 
 URL / `#N` / `owner/repo#N` / Jira キーが渡されていればそれを使う。**渡されていない、または「あの issue」程度の曖昧指定なら候補を一覧提示し、人間に1つ選ばせる。推測で自動選択しない。** 取り違えると Phase 1 の並列調査（サブエージェント2体）を丸ごと無駄撃ちするため、誤りのコストが提示1往復より高い。
 
+GitHub は次の2つを**それぞれ単独の Bash 呼び出し**で実行する（並列可。1つにまとめると sandbox の `gh *` 除外が効かず TLS 検証で失敗する）。
+
+自分にアサインされた open issue:
+
 ```bash
-# GitHub: 自分にアサインされた open issue
 gh issue list --assignee @me --state open --json number,title,updatedAt --limit 20
-# 現在のリポジトリ（`#N` 形式の解決先）
+```
+
+現在のリポジトリ（`#N` 形式の解決先）:
+
+```bash
 gh repo view --json nameWithOwner
 ```
 

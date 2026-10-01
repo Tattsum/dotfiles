@@ -22,13 +22,17 @@ PR をレビューし、**所有者で次アクションを振り分ける**エ�
 
 ### 1. 対象 PR の解決と所有者判定
 
+次の2つを**それぞれ単独の Bash 呼び出し**で実行する（並列可。1つにまとめると sandbox の `gh *` 除外が効かず TLS 検証で失敗する）。
+
+認証中の自分のアカウント:
+
 ```bash
-# 認証中の自分のアカウント
 gh api user -q .login
-# 対象 PR（引数指定が無ければ現在ブランチから解決）。body は次節のコンテキスト収集で使う（リンク抽出元）。
-# base 側は baseRefName だけを取る。gh には base リポジトリを返すフィールドが無く
-# （headRepository / headRepositoryOwner は head 側専用）、baseRepository を渡すと
-# Unknown JSON field で即座に落ちてこのコマンド自体が失敗する。
+```
+
+対象 PR（引数指定が無ければ現在ブランチから解決）。body は次節のコンテキスト収集で使う（リンク抽出元）。base 側は baseRefName だけを取る。gh には base リポジトリを返すフィールドが無く（headRepository / headRepositoryOwner は head 側専用）、baseRepository を渡すと Unknown JSON field で即座に落ちてこのコマンド自体が失敗する。
+
+```bash
 gh pr view [<PR番号 or URL>] --json number,author,url,headRefName,baseRefName,isCrossRepository,body
 ```
 
