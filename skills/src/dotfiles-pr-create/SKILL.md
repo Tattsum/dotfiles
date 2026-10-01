@@ -25,9 +25,14 @@ PR 作成の前に必ず以下を確認し、満たさない場合は**作成せ
 
 ```bash
 git rev-parse --abbrev-ref HEAD                 # 現在ブランチ
-gh repo view --json defaultBranchRef -q .defaultBranchRef.name   # デフォルトブランチ
 git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null # upstream（無ければ未設定）
 git status -sb                                  # ahead/behind の確認
+```
+
+デフォルトブランチは git と同じ呼び出しにまとめず、**単独の Bash 呼び出し**で取得する（まとめると sandbox の `gh *` 除外が効かず TLS 検証で失敗する）。
+
+```bash
+gh repo view --json defaultBranchRef -q .defaultBranchRef.name
 ```
 
 ## base ブランチ
