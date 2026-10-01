@@ -22,7 +22,16 @@
   "enabledPlugins": {
     "gopls-lsp@claude-plugins-official": true,
     "claude-code-setup@claude-plugins-official": true,
-    "swift-lsp@claude-plugins-official": true
+    "swift-lsp@claude-plugins-official": true,
+    "codex@openai-codex": true
+  },
+  "extraKnownMarketplaces": {
+    "openai-codex": {
+      "source": {
+        "source": "github",
+        "repo": "openai/codex-plugin-cc"
+      }
+    }
   },
   "sandbox": {
     "enabled": true,
@@ -50,8 +59,14 @@
     },
     "excludedCommands": [
       "gh *",
-      "git push *"
+      "git push *",
+      "node *codex-companion.mjs*"
     ]
+  },
+  "modelSettings": {
+    "claude-opus-5-5": {
+      "effortLevel": "xhigh"
+    }
   },
   "advisorModel": "opus",
   "autoMode": {
@@ -86,10 +101,5 @@
       "**Org-specific CLIs**: None configured — observed local tooling is modern-CLI replacements (fd, bat, rg, sd, dust, procs, zoxide) and zellij/helix/yazi",
       "**Routine actions**: local file reads and searches with `fd` and `bat` inside /Users/tatsuma.kano/.dotfiles; `install.sh` symlink runs into $HOME config paths"
     ]
-  },
-  "modelSettings": {
-    "claude-opus-5-5": {
-      "effortLevel": "xhigh"
-    }
   }
 }
