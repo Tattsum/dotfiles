@@ -60,7 +60,8 @@
     "excludedCommands": [
       "gh *",
       "git push *",
-      "node *codex-companion.mjs*"
+      "node *codex-companion.mjs*",
+      "skill-review-state *"
     ]
   },
   "modelSettings": {

@@ -170,14 +170,13 @@ skill-resolve-diff --base <base>
 
 同じ PR を2回目以降にレビューすると、前回の投稿を見ずに投稿して矛盾（重複・撤回に見える沈黙・重大度の反転）が起きる。これを防ぐため、**投稿前に必ず `skill-review-state` で前回状態を取得**し、下記ルールで照合する。
 
-`skill-review-state` が **stderr に警告を出したら投稿せず止める**（取得漏れの検知。スレッドを取り落としたまま照合すると settled 済みの論点を再提起し、外向きに矛盾したコメントを出す）。`jq` に流すときも stderr を潰さないこと。
+`skill-review-state` が **stderr に警告を出したら投稿せず止める**（取得漏れの検知。スレッドを取り落としたまま照合すると settled 済みの論点を再提起し、外向きに矛盾したコメントを出す）。
+
+スレッドの解決状態（isResolved / isOutdated）・レビュー要約・会話欄コメントを正規化 JSON で取得する。REST の pulls/{pr}/comments だけでは isResolved が取れず、人間が「対応不要」と解決済みにした論点を検出できない。会話欄（issue_comments）に「対応不要」が書かれることもあり、レビュー要約（reviews）には inline に紐づかない指摘（gemini-code-assist の "Code Review" 等）が入るため、いずれも同時に取得する。
+
+**単独の Bash 呼び出し**で実行し、`jq` などへパイプしない（パイプやリダイレクトを付けると sandbox の `skill-review-state *` 除外が外れ、中の gh が TLS 検証で失敗する）。絞り込みが要るなら、長い出力が保存されたファイルに別の呼び出しで `jq` をかける。
 
 ```bash
-# スレッドの解決状態（isResolved / isOutdated）・レビュー要約・会話欄コメントを
-# 正規化 JSON で取得。REST の pulls/{pr}/comments だけでは isResolved が取れず、
-# 人間が「対応不要」と解決済みにした論点を検出できない。会話欄（issue_comments）に
-# 「対応不要」が書かれることもあり、レビュー要約（reviews）には inline に紐づかない
-# 指摘（gemini-code-assist の "Code Review" 等）が入るため、いずれも同時に取得する。
 skill-review-state <owner/repo> <pr番号>
 ```
 
