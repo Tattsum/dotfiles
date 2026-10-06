@@ -207,8 +207,6 @@ cask "clipy"
 cask "codex"
 # Write, edit, and chat about your code with AI
 cask "cursor"
-# App to build and share containerised applications and microservices
-cask "docker-desktop"
 # Collaborative team software
 cask "figma"
 # UI toolkit for building applications for mobile, web and desktop
@@ -305,6 +303,8 @@ cask "kitty"
 cask "notion"
 # Calendar for professionals and teams
 cask "notion-calendar"
+# Kubernetes and container management on the desktop
+cask "rancher"
 # Music streaming service
 cask "spotify"
 # Native GUI tool for relational databases

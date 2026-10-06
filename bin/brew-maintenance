@@ -18,12 +18,12 @@ LOG="$HOME/Library/Logs/brew-maintenance.log"
 KEEP_RUNS="${KEEP_RUNS:-30}"
 RUN_MARKER='^===== run start:'
 
-# 自己更新するアプリ（Cursor / Docker Desktop / Zed 等）は brew に触らせない。二重管理になり、
+# 自己更新するアプリ（Cursor / Rancher Desktop / Zed 等）は brew に触らせない。二重管理になり、
 # ChatGPT 1本で 605MB の再ダウンロードが毎日発生していた。
 # 注意: man brew に "Does not affect --greedy" とあり、--greedy を付けるとこの指定は無効化される。
 export HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS=1
 
-# cask の更新は既定で実行中アプリを強制終了させる。10:30 は業務時間内で、Docker Desktop の
+# cask の更新は既定で実行中アプリを強制終了させる。10:30 は業務時間内で、Rancher Desktop の
 # 停止やエディタの未保存状態の消失を招く。起動中のアプリはスキップさせ、次の機会に回す。
 export HOMEBREW_NO_UPGRADE_QUIT_CASKS=1
 
