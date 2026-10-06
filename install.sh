@@ -226,7 +226,7 @@ echo "🍺 Homebrew パッケージ（Brewfile）を適用します..."
 echo "------------------------------"
 if command -v brew >/dev/null 2>&1; then
   # bundle install は未導入を入れるだけでなく outdated な cask も更新する。bin/brew-maintenance と
-  # 同じ抑制を効かせないと、セットアップのたびに起動中の Docker Desktop やエディタが落とされ、
+  # 同じ抑制を効かせないと、セットアップのたびに起動中の Rancher Desktop やエディタが落とされ、
   # 自己更新するアプリを brew が二重に上書きする。
   export HOMEBREW_NO_UPGRADE_AUTO_UPDATES_CASKS=1
   export HOMEBREW_NO_UPGRADE_QUIT_CASKS=1
