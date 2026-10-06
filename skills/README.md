@@ -25,7 +25,10 @@ skills/
     ├── dotfiles-conflict-resolve/SKILL.md      # git コンフリクトを安全に解消（操作種別判定→退避線→解消→検証、add まで）
     ├── dotfiles-php-laravel-lint-test/SKILL.md # PHP/Laravel の lint / 静的解析 / test を実行
     ├── dotfiles-security-performance/SKILL.md  # 設計・実装時の軽量チェック（セキュリティは3つの問い＋原則、詳細は review-web-security）+ パフォーマンス
-    ├── dotfiles-review-and-act/SKILL.md        # PR レビュー → 所有者で分岐（自分=改修 / 他人=インライン投稿）
+    ├── dotfiles-review-and-act/                # PR レビュー → 所有者で分岐（自分=改修 / 他人=インライン投稿）
+    │   ├── SKILL.md
+    │   └── references/
+    │       └── cross-review.md                 # 別エージェント（Codex ⇄ Claude Code）の公式レビューをセカンドオピニオンとして取り込む手順（4オーケストレーター共通）
     ├── dotfiles-go-review/SKILL.md             # Go レビューのオーケストレーター（7観点=23サブエージェントを並列起動）
     ├── dotfiles-php-laravel-review/SKILL.md    # PHP/Laravel レビューのオーケストレーター（6観点=20サブエージェントを並列起動）
     ├── dotfiles-ts-review/SKILL.md             # TS/Vue/React レビューのオーケストレーター（6観点=20サブエージェントを並列起動）
