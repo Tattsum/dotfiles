@@ -1,0 +1,210 @@
+#!/usr/bin/env bash
+
+# review skill 群のオーケストレーターが、実行中のエージェントとは別のエージェントに
+# 公式レビューをセカンドオピニオンとして依頼するための共通スクリプト。
+# Claude Code からは Codex の `codex review` を、Codex からは Claude Code の
+# `/code-review` と `/security-review` を呼ぶ。結果の検証・重要度の付け直し・統合は
+# 判断を伴うので持ち込まない（呼び出し側の references/cross-review.md が正本）。
+#
+# Usage:
+#   skill-cross-review --from claude|codex --base <ref> [--timeout <sec>]
+#
+# Output: stdout に JSON 1 オブジェクト
+#   status    ok / skipped / failed
+#   reviewer  呼んだ相手（codex / claude）
+#   base      比較に使った base ref
+#   reviews   [{name, status, output}] 公式レビューごとの結果（output は自由形式テキスト）
+#   reason    skipped / failed の理由
+#
+# 終了コードは引数不正の 2 以外すべて 0 にし、成否は status で返す。セカンドオピニオンの
+# 失敗でメインのレビューを止めないため、呼び出し側には exit code で分岐させない。
+
+set -euo pipefail
+
+from=""
+base=""
+timeout_sec=900
+
+while [ $# -gt 0 ]; do
+  case "$1" in
+    --from)    from="${2:-}"; shift 2 ;;
+    --base)    base="${2:-}"; shift 2 ;;
+    --timeout) timeout_sec="${2:-}"; shift 2 ;;
+    *)         echo "不明な引数: $1" >&2; exit 2 ;;
+  esac
+done
+
+# 実行中のエージェントは環境変数から推測せず、呼び出し側に申告させる。Claude Code から
+# 起動された Codex のシェルにも CLAUDECODE=1 が継承されるため、環境変数で判定すると
+# 「自分は Claude だ」と誤認して Codex を呼び返す往復が起きる。
+case "$from" in
+  claude) reviewer=codex ;;
+  codex)  reviewer=claude ;;
+  *)      echo "--from は claude か codex で指定してください: $from" >&2; exit 2 ;;
+esac
+
+if [ -z "$base" ]; then
+  echo "--base は必須です（skill-resolve-diff が返した base を渡してください）" >&2
+  exit 2
+fi
+
+case "$timeout_sec" in
+  ''|*[!0-9]*|0) echo "--timeout は正の整数（秒）で指定してください: $timeout_sec" >&2; exit 2 ;;
+esac
+
+emit() {
+  local status="$1" reason="$2" reviews="${3:-[]}"
+  jq -n \
+    --arg status "$status" \
+    --arg reviewer "$reviewer" \
+    --arg base "$base" \
+    --argjson reviews "$reviews" \
+    --arg reason "$reason" \
+    '{status: $status, reviewer: $reviewer, base: $base, reviews: $reviews, reason: $reason}'
+}
+
+if ! command -v jq >/dev/null 2>&1; then
+  echo "jq が見つかりません。インストールしてから再実行してください" >&2
+  exit 1
+fi
+
+# 呼ばれた側のエージェントが同じ SKILL.md を読んで再びこのスクリプトを呼ぶ入れ子を止める。
+# プロンプトでの禁止だけではモデル次第で破られるため、継承される環境変数で機械的に止める。
+if [ -n "${SKILL_CROSS_REVIEW_DEPTH:-}" ]; then
+  emit skipped "入れ子の呼び出し（セカンドオピニオンの中からは呼び返さない）"
+  exit 0
+fi
+
+if ! command -v "$reviewer" >/dev/null 2>&1; then
+  emit failed "$reviewer コマンドが見つかりません"
+  exit 0
+fi
+
+if ! git rev-parse --git-dir >/dev/null 2>&1; then
+  emit failed "git リポジトリではありません"
+  exit 0
+fi
+
+if ! git rev-parse --verify --quiet "$base" >/dev/null 2>&1; then
+  emit failed "ブランチ $base が見つかりません"
+  exit 0
+fi
+
+if git diff --quiet "$base...HEAD"; then
+  emit skipped "$base...HEAD に差分がありません"
+  exit 0
+fi
+
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/skill-cross-review.XXXXXX")"
+trap 'rm -rf "$work_dir"' EXIT
+trap 'exit 143' TERM INT HUP
+
+# 子に親エージェントのセッションを識別する変数を渡さない。継承されると子の claude が入れ子の
+# セッションとして親のメッセージングソケットに繋がりにいき、Codex 側には Claude Code の
+# セッション用トークンが漏れる。Codex は Claude から起動されることもあるため、向きに関係なく
+# 両方のセッション変数を消す。CLAUDE_* / CODEX_* を丸ごと消さないのは、CLAUDE_CONFIG_DIR・
+# CODEX_HOME・CLAUDE_CODE_USE_BEDROCK のような利用者の設定まで落ちるため。
+# compgen の結果を <(...) で読まないのは、Claude の sandbox が /dev/fd を塞ぐため。
+scrub=()
+for name in $(compgen -e); do
+  case "$name" in
+    CLAUDECODE|CLAUDE_PID|CLAUDE_EFFORT|CLAUDE_TMPDIR|CLAUDE_PLUGIN_DATA|CLAUDE_PLUGIN_ROOT) ;;
+    CLAUDE_CODE_SESSION_ID|CLAUDE_CODE_SESSION_ATTENDED|CLAUDE_CODE_CHILD_SESSION) ;;
+    CLAUDE_CODE_ENTRYPOINT|CLAUDE_CODE_EXECPATH|CLAUDE_CODE_TMPDIR|CLAUDE_CODE_MESSAGING_*) ;;
+    CODEX_THREAD_ID|CODEX_SESSION_ID|CODEX_SANDBOX|CODEX_SANDBOX_*|CODEX_COMPANION_*) ;;
+    *) continue ;;
+  esac
+  scrub+=(-u "$name")
+done
+
+# macOS には timeout(1) が無いので perl で代替する。exec した子に alarm を直接掛けないのは、
+# codex / claude が起こす孫プロセスが残るうえ、SIGALRM 死を bash が stderr に報告するため。
+# 子を独立したプロセスグループにしてグループごと止め、GNU timeout と同じ 124 で返す。
+# 子のグループは外側からの kill（Codex のコマンドタイムアウト・Claude のタスク停止）が
+# 届かなくなるため、受けた TERM / INT / HUP は子へ転送する。転送しないと perl だけが死んで
+# alarm も消え、相手のレビューが時間制限なしで利用枠を使い続ける。
+# shellcheck disable=SC2016  # perl のソースなので $ をシェルに展開させない
+with_timeout='
+  my $limit = shift;
+  my $pid = fork() // die "fork: $!\n";
+  if ($pid == 0) { setpgrp(0, 0); exec @ARGV or die "exec: $!\n"; }
+  my $stop = sub { kill "TERM", -$pid; sleep 2; kill "KILL", -$pid; exit shift; };
+  $SIG{ALRM} = sub { $stop->(124) };
+  $SIG{$_} = sub { $stop->(143) } for qw(TERM INT HUP);
+  alarm $limit;
+  waitpid($pid, 0);
+  exit(($? & 127) ? 128 + ($? & 127) : $? >> 8);
+'
+
+run_review() {
+  local name="$1"; shift
+  local out="$work_dir/$name.out" err="$work_dir/$name.err" code=0
+  env ${scrub[@]+"${scrub[@]}"} SKILL_CROSS_REVIEW_DEPTH=1 \
+    perl -e "$with_timeout" "$timeout_sec" "$@" \
+    </dev/null >"$out" 2>"$err" || code=$?
+  printf '%s\n' "$code" >"$work_dir/$name.code"
+}
+
+review_result() {
+  local name="$1" code status output
+  code="$(command cat "$work_dir/$name.code")"
+  output="$(command cat "$work_dir/$name.out")"
+  if [ "$code" -eq 0 ] && [ -n "$output" ]; then
+    status=ok
+  elif [ "$code" -eq 124 ]; then
+    status=failed; output="${timeout_sec} 秒でタイムアウトしました"
+  else
+    status=failed
+    output="終了コード $code: $(tail -n 20 "$work_dir/$name.err")"
+  fi
+  jq -n --arg name "$name" --arg status "$status" --arg output "$output" \
+    '{name: $name, status: $status, output: $output}'
+}
+
+names=()
+case "$reviewer" in
+  codex)
+    # `codex review` は --base と独自指示を同時に受け付けない（clap が排他にしている）。
+    # 重点観点を渡すため、比較範囲は指示文の側で指定する。
+    prompt="git diff $base...HEAD の差分（$base と HEAD のマージベースから HEAD まで）をコードレビューしてください。正しさのバグに加えて、パフォーマンス（N+1・不要な計算や I/O・メモリ効率）とセキュリティ（インジェクション・認可漏れ・秘匿情報の露出等）を重点的に見てください。各指摘にはファイルパスと行番号を付けてください。ファイルは編集せず、他のエージェント（claude コマンド等）も呼び出さないでください。"
+    names=(codex-review)
+    run_review codex-review codex review \
+      -c 'sandbox_mode="read-only"' -c 'approval_policy="never"' "$prompt"
+    ;;
+  claude)
+    # --safe-mode で丸ごと無効化しないのは、bundled skill の /code-review まで読み込まれなく
+    # なるため。止めたいのは hooks（Codex プラグインのレビューゲートが子の終了時に Codex を
+    # 呼び返しうる）と MCP（sandbox 外の子から Slack や Gmail の送信系コネクタに届く）なので、
+    # disableAllHooks と --strict-mcp-config で絞る。書き込み系ツールは禁止し、dontAsk で
+    # 許可リスト外の Bash（skill-cross-review の再実行を含む）を拒否させる。
+    # 検索に rg / fd を許可しないのは、rg --pre と fd -x が任意コマンドを実行でき、レビュー
+    # 対象の差分に仕込まれた指示から読み取り専用を破れるため。git の書き出し・外部起動系の
+    # オプション（--output・grep -O）も同じ理由で拒否する。
+    # プロンプトを先頭に置くのは、可変長の --allowedTools が後続の位置引数を飲み込むため。
+    claude_opts=(
+      -p --no-session-persistence --permission-mode dontAsk
+      --settings '{"disableAllHooks":true}' --strict-mcp-config
+      --disallowedTools Edit Write NotebookEdit
+      'Bash(git * --output*)' 'Bash(git grep *-O*)' 'Bash(git grep *--open-files-in-pager*)'
+      --allowedTools Read Agent
+      'Bash(git diff *)' 'Bash(git log *)' 'Bash(git show *)' 'Bash(git status *)'
+      'Bash(git rev-parse *)' 'Bash(git merge-base *)' 'Bash(git grep *)' 'Bash(git blame *)'
+      'Bash(git ls-files *)'
+    )
+    names=(code-review security-review)
+    # /code-review は -p だとレベル未指定時に前回の対話セッションのレベルを引き継ぎ、
+    # 実行ごとに深さが揺れるので明示する。/security-review は引数を取らず、比較先は
+    # origin のデフォルトブランチ固定（--base と食い違いうる。呼び出し側に明記させる）。
+    run_review code-review claude "/code-review high $base...HEAD" "${claude_opts[@]}" &
+    run_review security-review claude "/security-review" "${claude_opts[@]}" &
+    wait
+    ;;
+esac
+
+reviews="$(for name in "${names[@]}"; do review_result "$name"; done | jq -sc '.')"
+
+if [ "$(printf '%s' "$reviews" | jq '[.[] | select(.status == "ok")] | length')" -eq 0 ]; then
+  emit failed "$(printf '%s' "$reviews" | jq -r '[.[] | "\(.name): \(.output)"] | join(" / ")')" "$reviews"
+else
+  emit ok "" "$reviews"
+fi

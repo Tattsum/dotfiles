@@ -61,6 +61,7 @@
       "gh *",
       "git push *",
       "node *codex-companion.mjs*",
+      "skill-cross-review *",
       "skill-review-state *"
     ]
   },
