@@ -130,6 +130,7 @@ echo "------------------------------"
 # 置くと参照側にパス解決のフォールバックが要る。コマンド名で呼べば1行で済む。
 link_file "$DOTFILES_DIR/bin/skill-resolve-diff" "$HOME/.local/bin/skill-resolve-diff"
 link_file "$DOTFILES_DIR/bin/skill-review-state" "$HOME/.local/bin/skill-review-state"
+link_file "$DOTFILES_DIR/bin/skill-cross-review" "$HOME/.local/bin/skill-cross-review"
 link_file "$DOTFILES_DIR/bin/skill-session-digest" "$HOME/.local/bin/skill-session-digest"
 link_file "$DOTFILES_DIR/bin/skill-nippo-notion-post" "$HOME/.local/bin/skill-nippo-notion-post"
 

@@ -13,6 +13,7 @@ PHP / Laravel の `<base>...HEAD` 差分を、6観点を focus 単位に細分�
 ## Input
 
 - `--base=<branch>`: optional。解決は `skill-resolve-diff` に委譲する（`origin/master`、無ければ `origin/main`）。
+- `--no-cross-review`: optional。指定するとセカンドオピニオン（別エージェントの公式レビュー）を実行しない。`dotfiles-review-and-act` から委譲されたときは必ず付く（PR 全体に対して呼び出し元が 1 回だけ実行するため）。
 
 ## Workflow
 
@@ -40,8 +41,11 @@ skill-resolve-diff --base <base> -- '*.php' '*.blade.php' 'database/migrations/*
 
    **上記 8 ファイル（focus-block 6 ＋ security 用の参照 2）のどれか一つでも読めなければ停止する（fail closed）**。読めなかったファイル名を挙げ、`./install.sh` を実行して skill を再配置するよう伝えて終了する。一部だけで続行しない: 「その観点で指摘が0件だった」と「その観点をそもそも実行していない」が出力上区別できず、同じ PR を再レビューしたときに前回の指摘が理由なく消えるため。
 
+   `--no-cross-review` が無ければ `~/.claude/skills/dotfiles-review-and-act/references/cross-review.md` も Read する。読めなくても停止せず、セカンドオピニオンを `未実施（cross-review.md が読めない）` として続行する。focus block の fail closed と扱いを分けるのは、相手エージェントの所見は補助であり、欠けても自分側の観点の網羅性は変わらないため。
+
 6. 各ファイル内の `## Focus ...` ブロックが1サブエージェント分の担当範囲。**読み込めた focus block を実際に数え、その数だけ** `general-purpose` サブエージェントを**1つのアシスタントメッセージ内で一斉に並列起動**する。1サブエージェント＝1 focus block。逐次実行やインラインレビューで代替しない。件数はここに書かず必ず数えること（ハードコードすると focus 追加時にドリフトする）。Agent が使えない場合は、本スキルはユーザーセッションから直接起動する必要がある旨を伝えて終了。
-7. 全サブエージェントの完了を待つ。
+   `--no-cross-review` が無ければ、同じアシスタントメッセージで `cross-review.md` の「起動」に従い `skill-cross-review --from <claude|codex> --base <base>` も起動する。
+7. 全サブエージェントとセカンドオピニオンの完了を待つ。
 8. 統合の前に、下記「横断チェック」を全体差分に対してオーケストレーター自身で実施し、所見を観点 `横断` として持つ。
 
 ## Subagent Prompt Shape
@@ -99,10 +103,10 @@ skill-resolve-diff --base <base> -- '*.php' '*.blade.php' 'database/migrations/*
 
 全サブエージェントが返ったら:
 
-1. 観点（OWNER）ごとに指摘件数をカウントする。横断チェックの所見も観点 `横断` としてカウントに含める。
+1. 観点（OWNER）ごとに指摘件数をカウントする。横断チェックの所見も観点 `横断` としてカウントに含める。セカンドオピニオンは先に `cross-review.md` の「結果の扱い」で検証・分類し、検証済みで自分側と重複しないものを観点 `second opinion` として含める（実行しなかった場合は 0 件）。
 2. 各指摘が `<TARGET_FILES>` 内のファイルを参照しているか検証し、対象外は警告付きで分離する。
 3. 統合は「同一ファイル・同一行・同一の focus 見出し（逐語一致）」の場合のみ行い、統合時は元の観点名を併記する。サブエージェントが見出しを言い換えていた場合は、言い換えのまま統合せず focus block の見出しに引き直す。
-4. `観点別カウント: architecture: N件, idioms: N件, storage: N件, test: N件, security: N件, observability: N件, 横断: N件 (合計N件) → 重複統合M件 → リストN-M件` を出力し、差分があれば原因を明記する。
+4. `観点別カウント: architecture: N件, idioms: N件, storage: N件, test: N件, security: N件, observability: N件, 横断: N件, second opinion: N件 (合計N件) → 重複統合M件 → リストN-M件` を出力し、差分があれば原因を明記する。
 5. まず観点 × 重要度のサマリー表を出力する。各セルは件数。観点に指摘がなければ `0` を入れる。
 
 ```markdown
@@ -117,6 +121,7 @@ skill-resolve-diff --base <base> -- '*.php' '*.blade.php' 'database/migrations/*
 | security     | 0 | 0 | 0 | 0 |
 | observability | 0 | 0 | 0 | 0 |
 | 横断         | 0 | 0 | 0 | 0 |
+| second opinion | 0 | 0 | 0 | 0 |
 | **合計**     | 0 | 0 | 0 | 0 |
 ```
 
@@ -134,5 +139,7 @@ skill-resolve-diff --base <base> -- '*.php' '*.blade.php' 'database/migrations/*
 ```
 
    security の指摘は、サブエージェントの `重要度案` をそのまま重要度に使う（根拠が `output-discipline.md` の軸に沿っていない場合だけ調整し、調整した旨と理由を注記する）。詳細には Source→Sink を併記する。security 担当の「確認できなかった範囲」は重複を除き、詳細の最後に `## 🔍 確認できなかった範囲（security）` としてまとめる。
+
+7. 重要度別の詳細のあと（`確認できなかった範囲` より前）に、`cross-review.md` の「出力」に従って `## 🔁 セカンドオピニオン（<reviewer>）` 枠を出す。実行しなかった・失敗した場合も `未実施（理由）` の 1 行を出す。
 
 全観点で指摘がなかった場合は `全観点で PHP / Laravel レビューの指摘はありません` と明記する（security の「確認できなかった範囲」があれば併記する）。
