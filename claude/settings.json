@@ -9,7 +9,7 @@
       "WebFetch(domain:play.google.com)"
     ]
   },
-  "model": "opus[1m]",
+  "model": "opus",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -23,13 +23,20 @@
     "gopls-lsp@claude-plugins-official": true,
     "claude-code-setup@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
-    "codex@openai-codex": true
+    "codex@openai-codex": true,
+    "yappli-vuln-assessment-shared@yappli-marketplace": true
   },
   "extraKnownMarketplaces": {
     "openai-codex": {
       "source": {
         "source": "github",
         "repo": "openai/codex-plugin-cc"
+      }
+    },
+    "yappli-marketplace": {
+      "source": {
+        "source": "github",
+        "repo": "fastmedia/claude-code-marketplace"
       }
     }
   },
@@ -68,8 +75,12 @@
   "modelSettings": {
     "claude-opus-5-5": {
       "effortLevel": "xhigh"
+    },
+    "claude-opus-4-8": {
+      "effortLevel": "xhigh"
     }
   },
+  "ultracode": true,
   "advisorModel": "opus",
   "autoMode": {
     "allow": [
