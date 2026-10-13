@@ -15,6 +15,7 @@ TypeScript / Vue / React フロントエンドの `<base>...HEAD` 差分を、6�
 
 - `--base=<branch>`: optional。解決は `skill-resolve-diff` に委譲する（`origin/master`、無ければ `origin/main`）。
 - `--no-cross-review`: optional。指定するとセカンドオピニオン（別エージェントの公式レビュー）を実行しない。`dotfiles-review-and-act` から委譲されたときは必ず付く（PR 全体に対して呼び出し元が 1 回だけ実行するため）。
+- `--reachability-context=<path>`: optional。指定するとそのファイルを Read して `<REACHABILITY_CONTEXT>` とし、到達性を自分では解決しない。`dotfiles-review-and-act` から委譲されたときは付く（PR 全体に対して呼び出し元が 1 回だけ解決するため）。読めなければ止めず `未解決（<path> が読めない）` として続行する。会話の文脈ではなくファイルで受け渡すのは、子がインライン Skill でも別コンテキストでも同じに動くため。
 
 ## Workflow
 
@@ -44,6 +45,8 @@ skill-resolve-diff --base <base> -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.vue'
 
    `--no-cross-review` が無ければ `~/.claude/skills/dotfiles-review-and-act/references/cross-review.md` も Read する。読めなくても停止せず、セカンドオピニオンを `未実施（cross-review.md が読めない）` として続行する。focus block の fail closed と扱いを分けるのは、相手エージェントの所見は補助であり、欠けても自分側の観点の網羅性は変わらないため。
 
+   `--reachability-context` が無ければ、次の手順の focus サブエージェント起動より前に、`general-purpose` サブエージェントを 1 体起動し、`~/.claude/skills/review-reachability/SKILL.md` を Read してその手順に従わせ（`--base <base>` を渡す）、返った出力を `<REACHABILITY_CONTEXT>` とする。`SKILL.md` が読めない・サブエージェントが失敗した場合も停止せず、`<REACHABILITY_CONTEXT>` を `未解決（<理由>）` として続行する（全指摘が「到達性: 未確定」になる）。focus block の fail closed と扱いを分けるのは、cross-review と同じく到達性は補助であり、欠けても各観点の網羅性は変わらないため。
+
 6. 各ファイル内の `## Focus ...` ブロックが1サブエージェント分の担当範囲。**読み込めた focus block を実際に数え、その数だけ** `general-purpose` サブエージェントを**1つのアシスタントメッセージ内で一斉に並列起動**する。1サブエージェント＝1 focus block。逐次実行やインラインレビューで代替しない。件数はここに書かず必ず数えること（ハードコードすると focus 追加時にドリフトする）。Agent が使えない場合は、本スキルはユーザーセッションから直接起動する必要がある旨を伝えて終了。
    `--no-cross-review` が無ければ、同じアシスタントメッセージで `cross-review.md` の「起動」に従い `skill-cross-review --from <claude|codex> --base <base>` も起動する。
 7. 全サブエージェントとセカンドオピニオンの完了を待つ。
@@ -51,7 +54,7 @@ skill-resolve-diff --base <base> -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.vue'
 
 ## Subagent Prompt Shape
 
-各サブエージェントには、下記の共有コンテキストと 1 つの focus block を渡す。`<OWNER>` には観点名（architecture / idioms / state / performance / security / test）を入れる。security 担当には、共有プロンプトの末尾に次の指示を足す: 「最初に `~/.claude/skills/review-web-security/references/output-discipline.md` と `~/.claude/skills/review-web-security/references/sinks-ts.md` を Read すること。出力は output-discipline.md の出力フォーマット（Source→Sink と重要度案を足し、最後に「確認できなかった範囲」を付ける）に従い、共有プロンプトの出力フォーマットと「該当なし」の書き方よりこちらを優先する。focus block の「誤検知の注意」に当たるものは報告しない。」
+各サブエージェントには、下記の共有コンテキストと 1 つの focus block を渡す。`<OWNER>` には観点名（architecture / idioms / state / performance / security / test）を入れる。security 担当には、共有プロンプトの末尾に次の指示を足す: 「最初に `~/.claude/skills/review-web-security/references/output-discipline.md` と `~/.claude/skills/review-web-security/references/sinks-ts.md` を Read すること。出力は output-discipline.md の出力フォーマット（到達性・既存の公開面・CWE を含む）に従い、共有プロンプトの出力フォーマットと「該当なし」の書き方よりこちらを優先する。focus block の「誤検知の注意」に当たるものは報告しない。」あわせて同じ末尾に、`到達性コンテキスト:` の見出しに続けて `<REACHABILITY_CONTEXT>` を足し、次の 1 行を足す: 「これは差分の所有者側による防御目的のレビュー。攻撃手順・PoC は書かず、欠けている検証と修正の方向で書く（詳細は output-discipline.md）。」到達性コンテキストは security 担当にだけ渡す（到達性は security の重要度にだけ効き、他観点のプロンプトを太らせないため）。
 
 ```text
 あなたは TypeScript / Vue / React フロントエンドコードレビュー（観点: <OWNER>）の1名のレビュー担当です。レビューのみ行い、ファイルは編集しないでください。
@@ -105,10 +108,19 @@ skill-resolve-diff --base <base> -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.vue'
 全サブエージェントが返ったら:
 
 1. 観点（OWNER）ごとに指摘件数をカウントする。横断チェックの所見も観点 `横断` としてカウントに含める。セカンドオピニオンは先に `cross-review.md` の「結果の扱い」で検証・分類し、検証済みで自分側と重複しないものを観点 `second opinion` として含める（実行しなかった場合は 0 件）。
+   到達性コンテキストを自分で解決した場合（`--reachability-context` が無かった場合）に exposure findings があれば、観点 `到達性・公開範囲の変更` として含める（無ければ 0 件）。`--reachability-context` で受け取った場合（自分で解決していない場合）は、呼び出し元の `dotfiles-review-and-act` が exposure findings を直接 <FINDINGS> に加えるため、観点別カウント行とサマリー表の `到達性・公開範囲の変更` は `未実行` と書く（0 件と書かない）。
+   security 担当の出力に `確認できなかった範囲` 節が無い、またはエラー・拒否文で終わっている場合、その focus を 0 件として数えず「失敗」とする。観点別カウント行とサマリー表の security は、複数の focus 担当を 1 行に集約するため、成功した focus 分の件数に `（失敗: focus X）` を併記し（review-web-security は focus ごとの行なので `失敗` と書く）、`確認できなかった範囲` に `focus X: 出力不完全（再実行を推奨）` を載せる。「該当なし」でも節があれば正常として扱う: 「0 件」と「実行できていない」を出力上区別するため。
 2. 各指摘が `<TARGET_FILES>` 内のファイルを参照しているか検証し、対象外は警告付きで分離する。
-3. 統合は「同一ファイル・同一行・同一の focus 見出し（逐語一致）」の場合のみ行い、統合時は元の観点名を併記する。サブエージェントが見出しを言い換えていた場合は、言い換えのまま統合せず focus block の見出しに引き直す。
-4. `観点別カウント: architecture: N件, idioms: N件, state: N件, performance: N件, security: N件, test: N件, 横断: N件, second opinion: N件 (合計N件) → 重複統合M件 → リストN-M件` を出力し、差分があれば原因を明記する。
-5. まず観点 × 重要度のサマリー表を出力する。各セルは件数。観点に指摘がなければ `0` を入れる。
+3. 統合は「同一ファイル・同一行・同一の focus 見出し（逐語一致）」の場合のみ行い、統合時は元の観点名を併記する。サブエージェントが見出しを言い換えていた場合は、言い換えのまま統合せず focus block の見出しに引き直す。ただし観点 `到達性・公開範囲の変更` は focus block ではないので引き直さない（この観点名のまま扱う）。
+4. 重複統合の後・反証の前に、security の指摘の重要度を確定する。`重要度案` を採用し、根拠が `output-discipline.md` の軸に沿っていない場合だけ調整して、調整した旨と理由を指摘に注記する。反証には調整後の Must を渡すため、反証より前に行う。
+5. 調整後の security の Must 候補（観点 `到達性・公開範囲の変更` を除く）が 1 件以上あれば、`~/.claude/skills/review-web-security/references/must-verification.md` を Read し、その契約で `general-purpose` の反証サブエージェントを 1 体起動して Must 候補をまとめて渡す（`<REACHABILITY_CONTEXT>`・`<TARGET_FILES>`・base も渡す）。判定は次のとおり反映する。以降のカウント・サマリー表・詳細は反映後の重要度で出す。
+   - 維持: そのまま。
+   - 格下げ: 新しい重要度へ移し、`反証により格下げ（証拠: …）` を注記する。
+   - 取り下げ: 指摘リストから外し、`## 🧪 反証で格下げ・取り下げた指摘` に証拠つきで列挙する。黙って消さない。
+
+   Read 失敗・反証サブエージェントの失敗は止めず、Must を維持して `## 🧪 反証で格下げ・取り下げた指摘` の先頭行を `未実施（<理由>）` とする。候補単位で未実施のものは、その Must の詳細行の末尾に `（反証: 未実施・出力不完全）` と注記する。fail closed にしないのは、cross-review と同じく反証は補助であり、欠けても網羅性は変わらないため。
+6. `観点別カウント: architecture: N件, idioms: N件, state: N件, performance: N件, security: N件, test: N件, 横断: N件, 到達性・公開範囲の変更: N件, second opinion: N件 (合計N件) → 重複統合M件 → 反証取り下げK件 → リストN-M-K件` を出力し、差分があれば原因を明記する。以降の出力順は 🌐 到達性コンテキスト → 📊 サマリー → 重要度別の詳細 → 🧪 反証 → 🔁 セカンドオピニオン → 🔍 確認できなかった範囲（security）とする。
+7. まず `## 🌐 到達性コンテキスト` として `<REACHABILITY_CONTEXT>` の review-reachability の表をそのまま出す（JSON ブロックは出さない。`未解決` のときはその旨と理由の 1 行）。`--reachability-context` で受け取ったときは表を再掲せず、見出しの下に `呼び出し元（dotfiles-review-and-act）で表示済み` とだけ書く（言語混在 PR で同じ表が言語の数だけ出るのを防ぐため）。自分で解決したときだけ表を出す。続けて観点 × 重要度のサマリー表を出力する。各セルは件数。観点に指摘がなければ `0` を入れる。受け取った到達性コンテキストの `到達性・公開範囲の変更` の行は `未実行` とする。
 
 ```markdown
 ## 📊 レビューサマリー
@@ -122,11 +134,12 @@ skill-resolve-diff --base <base> -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.vue'
 | security     | 0 | 0 | 0 | 0 |
 | test         | 0 | 0 | 0 | 0 |
 | 横断         | 0 | 0 | 0 | 0 |
+| 到達性・公開範囲の変更 | 0 | 0 | 0 | 0 |
 | second opinion | 0 | 0 | 0 | 0 |
 | **合計**     | 0 | 0 | 0 | 0 |
 ```
 
-6. サマリー表に続けて、重要度別フォーマットで指摘の詳細を出力する。各指摘に `[ファイルパス:行番号]` と観点名を付ける。
+8. サマリー表に続けて、重要度別フォーマットで指摘の詳細を出力する。各指摘に `[ファイルパス:行番号]` と観点名を付ける。
 
 ```
 ## 🔴 Must（必ず修正）
@@ -139,8 +152,8 @@ skill-resolve-diff --base <base> -- '*.ts' '*.tsx' '*.js' '*.jsx' '*.vue'
 - [path:line] (観点) 提案
 ```
 
-   security の指摘は、サブエージェントの `重要度案` をそのまま重要度に使う（根拠が `output-discipline.md` の軸に沿っていない場合だけ調整し、調整した旨と理由を注記する）。詳細には Source→Sink を併記する。security 担当の「確認できなかった範囲」は重複を除き、詳細の最後に `## 🔍 確認できなかった範囲（security）` としてまとめる。
+   security の指摘の詳細には Source→Sink を併記し、その下に `  - 到達性: … / 既存の公開面: …` の 1 行を足す（値は output-discipline.md の `到達性` と `既存の公開面`）。
 
-7. 重要度別の詳細のあと（`確認できなかった範囲` より前）に、`cross-review.md` の「出力」に従って `## 🔁 セカンドオピニオン（<reviewer>）` 枠を出す。実行しなかった・失敗した場合も `未実施（理由）` の 1 行を出す。
+9. 重要度別の詳細のあと（`確認できなかった範囲` より前）に、まず `## 🧪 反証で格下げ・取り下げた指摘` を出す。先頭行は固定文言の 3 状態のどれかにする: `対象なし（security の Must 候補 0 件）` / `実施: N 件を検証、格下げ X 件・取り下げ Y 件`（その下に格下げ・取り下げを証拠つきで列挙する） / `未実施（理由）`。続けて `cross-review.md` の「出力」に従って `## 🔁 セカンドオピニオン（<reviewer>）` 枠を出す。実行しなかった・失敗した場合も `未実施（理由）` の 1 行を出す。最後に `## 🔍 確認できなかった範囲（security）` を出し、ここを集約先とする: security 各 focus・反証エージェント・到達性（review-reachability の末尾節。表だけを出し末尾節を捨てない）の「確認できなかった範囲」、失敗 focus の出力不完全、切り詰めの報告を重複を除いてまとめる。
 
-全観点で指摘がなかった場合は `全観点で TypeScript / Vue / React レビューの指摘はありません` と明記する（security の「確認できなかった範囲」があれば併記する）。
+全観点で指摘がなかった場合は `全観点で TypeScript / Vue / React レビューの指摘はありません` と明記し、失敗した focus・反証未実施・到達性未解決・確認できなかった範囲があればその旨を併記し、指摘なしを安全と読ませない。

@@ -37,7 +37,8 @@ skills/
     │   └── references/
     │       ├── focus-blocks.md                 # コード用 8 focus（インジェクション〜情報露出・ログ・本番設定）
     │       ├── focus-blocks-supply-chain.md    # 配備・サプライチェーン（Dockerfile / CI / lock があるときだけ起動）
-    │       ├── output-discipline.md            # Source→Sink・確認できなかった範囲・重要度案の出力規律
+    │       ├── must-verification.md            # security の Must 候補を 1 体で反証する契約
+    │       ├── output-discipline.md            # Source→Sink・確認できなかった範囲・到達性・2 軸の重要度の出力規律
     │       └── sinks-go.md / sinks-php.md / sinks-ts.md  # 言語別 Sink 表
     ├── review-go-architecture/                 # Go: アーキテクチャ / レイヤー責務（単体観点）
     │   ├── SKILL.md
@@ -87,6 +88,9 @@ skills/
     ├── review-ts-test/                         # TS: テスト戦略 / テスト品質（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
+    ├── review-reachability/                    # 差分が触れる入口・リソースの到達性（IaC＋任意でライブ）を返す。security 観点と review-and-act が利用
+    │   ├── SKILL.md
+    │   └── references/iac-signals.md
     ├── review-iac/                             # IaC: Terraform/jsonnet の module 境界・ライフサイクル / 命名規約（単体観点）
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
@@ -114,3 +118,11 @@ skills/
 
 グローバル配置は symlink なので、`src/` を編集した時点で反映される。`skill-*` スクリプトも
 `install.sh` が `~/.local/bin/` へリンクするため、SKILL.md からはコマンド名で呼べる。
+
+### skill-aws-reach（到達性のライブ裏取り）
+
+`review-reachability` が AWS の到達性メタデータ（LB・SG・サブネット・CloudFront・API Gateway など）を読むための、許可した Describe/Get だけを呼ぶラッパー。
+
+- `SKILL_AWS_REACH_PROFILE` に宣言するのは、[SecurityAudit](https://docs.aws.amazon.com/aws-managed-policy/latest/reference/SecurityAudit.html) 相当のメタデータ専用ロールのプロファイルに限る。ラッパーはロールの権限を検証できないため、ロールの用意は利用者の責任
+- 未設定なら AWS を呼ばず IaC のみで判定する
+- 値（プロファイル・リージョン・許可アカウント）は公開リポに書かず、ハブリポの `settings.local.json` の `env` などで渡す
