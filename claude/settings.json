@@ -10,7 +10,7 @@
       "WebFetch(domain:play.google.com)"
     ]
   },
-  "model": "opus",
+  "model": "claude-opus-5-5",
   "statusLine": {
     "type": "command",
     "command": "~/.claude/statusline.sh",
@@ -84,6 +84,7 @@
   },
   "ultracode": true,
   "advisorModel": "opus",
+  "switchModelsOnFlag": false,
   "autoMode": {
     "allow": [
       "$defaults",
