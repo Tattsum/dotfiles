@@ -1,0 +1,716 @@
+#!/usr/bin/env bash
+
+# review-reachability が、AWS 上のリソースの到達性（誰が・どの経路で届くか）を読み取り専用で
+# 裏取りするための決定的ラッパー。IaC の記述と実環境の食い違い（drift）を確かめるために使い、
+# 判断（公開か内部か・重要度）は持ち込まない（呼び出し側の review-reachability が正本）。
+# sandbox の excludedCommands で sandbox 外へ出すのはこのラッパーだけで、生の `aws` は
+# sandbox 内に残る（許可ドメインに amazonaws.com が無いため届かない）。
+#
+# Usage:
+#   skill-aws-reach <query> [--region <region>] <query 固有の引数>
+#
+#   whoami                                              （引数なし）
+#   lb          --name <lb-name> | --arn <lb-arn>       （--arn のリージョンを使う）
+#   sg          --id <sg-id>
+#   subnet      --id <subnet-id>
+#   cloudfront  --id <distribution-id> | --alias <domain>
+#   apigw-rest  --id <rest-api-id> | --name <name>
+#   apigw-http  --id <api-id> | --name <name>
+#   lambda-url  --name <function-name>
+#   ecs-service --cluster <cluster> --service <service>
+#   dns         --name <record-name> [--zone-id <zone-id>]
+#
+# Output: stdout に JSON 1 オブジェクト
+#   status      ok / partial / unconfigured / unauthenticated / denied / not_found / refused / failed
+#   query       呼んだ query
+#   target      引数で指した対象
+#   account     呼び出し元のアカウント ID（sts get-caller-identity の結果）
+#   region      実際に使った値（--region / lb の --arn / SKILL_AWS_REACH_REGION / プロファイルの既定の順）。
+#               どれも無ければ null
+#   checked_at  確認した時刻（UTC）
+#   calls       [{api, status, reason?}] 呼んだ API ごとの結果
+#   result      query ごとの射影（許可した項目だけ）。ok / partial のときだけ非 null
+#   reason      ok 以外の理由
+# partial は主問い合わせが ok で、副問い合わせ（WAF・route table 等）が ok 以外のとき。
+# 副の結果は null になり、理由は calls に残る。
+#
+# 環境変数（値は公開リポに書かず、利用者側の設定から渡す）:
+#   SKILL_AWS_REACH_PROFILE   必須。未設定なら AWS を一切呼ばず unconfigured を返す。
+#                             宣言するのは SecurityAudit 相当のメタデータ専用ロールのプロファイルに
+#                             限る。ラッパーはロールの権限を検証できないので、書き込みやデータ読み取りが
+#                             できるロールを宣言しないこと、ロールを用意することは利用者の責任。
+#   SKILL_AWS_REACH_REGION    任意。--region が無いときの既定。lb --arn のリージョンと食い違えば exit 2。
+#   SKILL_AWS_REACH_ACCOUNTS  任意。カンマ区切りの許可アカウント ID。設定時は毎回 whoami の結果と
+#                             照合し、不一致なら以降を呼ばず refused を返す。
+#
+# 呼ばない API（Why not）:
+#   ecs describe-task-definition            環境変数の平文を返しうるため
+#   lambda get-function / get-function-configuration
+#                                           環境変数と、コードの署名付き URL を返しうるため
+#   ec2 create-* / VPC Reachability Analyzer  分析リソースの作成と課金を伴うため
+#   s3 / dynamodb / logs / ssm / sqs / secretsmanager のデータ読み取り全般
+#                                           データ本体に届くため（ReadOnlyAccess を使わない理由）
+# 応答は丸ごと返さず、許可した項目だけを jq で射影する。ALB ルール条件の値は host-header・path-pattern・
+# http-request-method・source-ip だけ出し（http-header の値は認証代わりに使われうるので名前のみ）、
+# CloudFront の OriginCustomHeaders の値・SG ルールの description・API Gateway のポリシー本文は
+# 秘匿情報を含みうるので射影しない（名前や条件キー名だけを返す）。
+# 失敗の理由に aws の stderr を載せないのは、アカウント ID や ARN が混ざり、PR コメントへ
+# 転記されうるため。分類した status とエラーコードだけを返す。
+#
+# 終了コードは引数不正の 2 以外すべて 0 にし、成否は status で返す。呼び出し側には exit code で
+# 分岐させない（skill-cross-review と同じ流儀）。
+
+set -euo pipefail
+
+usage() {
+  echo "$1" >&2
+  echo "Usage: skill-aws-reach <query> [--region <region>] <query 固有の引数>" >&2
+  exit 2
+}
+
+query="${1:-}"
+[ -n "$query" ] || usage "query は必須です"
+shift
+
+case "$query" in
+  whoami|lb|sg|subnet|cloudfront|apigw-rest|apigw-http|lambda-url|ecs-service|dns) ;;
+  *) usage "不明な query: $query" ;;
+esac
+
+opt_region="" opt_name="" opt_arn="" opt_id="" opt_alias="" opt_cluster="" opt_service="" opt_zone_id=""
+given=""
+
+while [ $# -gt 0 ]; do
+  key="$1"
+  case "$key" in
+    --region|--name|--arn|--id|--alias|--cluster|--service|--zone-id) ;;
+    *) usage "不明な引数: $key" ;;
+  esac
+  [ $# -ge 2 ] || usage "$key に値がありません"
+  case " $given " in *" $key "*) usage "$key が重複しています" ;; esac
+  given="$given $key"
+  var="opt_${key#--}"
+  printf -v "${var//-/_}" '%s' "$2"
+  shift 2
+done
+
+has() { case " $given " in *" --$1 "*) return 0 ;; esac; return 1; }
+
+allow_only() {
+  local k
+  for k in $given; do
+    case " --region $* " in *" $k "*) ;; *) usage "$query では $k を使えません" ;; esac
+  done
+}
+
+# 値の先頭が - のものは、別のオプションの取り違えか aws へのフラグ注入になるので正規表現より前に弾く。
+check() {
+  local key="$1" val="$2" re="$3"
+  case "$val" in -*) usage "$key の値が - で始まっています" ;; esac
+  [ "${#val}" -le 2048 ] || usage "$key の値が長すぎます"
+  [[ $val =~ $re ]] || usage "$key の値が不正です: $val"
+}
+
+one_of() {
+  local a="$1" b="$2"
+  if has "$a" && has "$b"; then usage "--$a と --$b は同時に指定できません"; fi
+  if ! has "$a" && ! has "$b"; then usage "--$a か --$b のどちらかが必要です"; fi
+}
+
+re_region='^[a-z]{2}(-[a-z]+)+-[0-9]+$'
+re_name='^[A-Za-z0-9._-]{1,255}$'
+re_lb_arn='^arn:aws[a-z-]*:elasticloadbalancing:[A-Za-z0-9:/._-]+$'
+re_lb_arn_region='^arn:aws[a-z-]*:elasticloadbalancing:([a-z]{2}(-[a-z]+)+-[0-9]+):'
+re_domain='^[A-Za-z0-9.-]{1,253}$'
+re_upper_id='^[A-Z0-9]{1,32}$'
+re_api_id='^[A-Za-z0-9]{1,32}$'
+
+has region && check --region "$opt_region" "$re_region"
+
+case "$query" in
+  whoami)
+    allow_only
+    ;;
+  lb)
+    allow_only --name --arn
+    one_of name arn
+    has name && check --name "$opt_name" "$re_name"
+    has arn && check --arn "$opt_arn" "$re_lb_arn"
+    ;;
+  sg)
+    allow_only --id
+    has id || usage "--id は必須です"
+    check --id "$opt_id" '^sg-[0-9a-f]+$'
+    ;;
+  subnet)
+    allow_only --id
+    has id || usage "--id は必須です"
+    check --id "$opt_id" '^subnet-[0-9a-f]+$'
+    ;;
+  cloudfront)
+    allow_only --id --alias
+    one_of id alias
+    has id && check --id "$opt_id" "$re_upper_id"
+    has alias && check --alias "$opt_alias" "$re_domain"
+    ;;
+  apigw-rest|apigw-http)
+    allow_only --id --name
+    one_of id name
+    has id && check --id "$opt_id" "$re_api_id"
+    has name && check --name "$opt_name" "$re_name"
+    ;;
+  lambda-url)
+    allow_only --name
+    has name || usage "--name は必須です"
+    check --name "$opt_name" "$re_name"
+    ;;
+  ecs-service)
+    allow_only --cluster --service
+    has cluster || usage "--cluster は必須です"
+    has service || usage "--service は必須です"
+    check --cluster "$opt_cluster" "$re_name"
+    check --service "$opt_service" "$re_name"
+    ;;
+  dns)
+    allow_only --name --zone-id
+    has name || usage "--name は必須です"
+    check --name "$opt_name" "$re_domain"
+    has zone-id && check --zone-id "$opt_zone_id" "$re_upper_id"
+    ;;
+esac
+
+region="${opt_region:-${SKILL_AWS_REACH_REGION:-}}"
+[ -z "$region" ] || [[ $region =~ $re_region ]] || usage "SKILL_AWS_REACH_REGION の値が不正です"
+
+if has arn; then
+  [[ $opt_arn =~ $re_lb_arn_region ]] || usage "--arn からリージョンを取り出せません"
+  if [ -n "$region" ] && [ "$region" != "${BASH_REMATCH[1]}" ]; then
+    usage "--region / SKILL_AWS_REACH_REGION が --arn のリージョンと食い違っています"
+  fi
+  region="${BASH_REMATCH[1]}"
+fi
+
+# jq が無いと JSON を組み立てられないので、固定の文字列で返す。
+finish_static() {
+  printf '{"status":"failed","query":"%s","target":null,"account":null,"region":null,"checked_at":null,"calls":[],"result":null,"reason":"%s"}\n' \
+    "$query" "$1"
+  exit 0
+}
+
+command -v jq >/dev/null 2>&1 || finish_static "jq が見つかりません"
+
+profile="${SKILL_AWS_REACH_PROFILE:-}"
+account=""
+partial_reason=""
+call_seq=0
+CALL_OUT=""
+CALL_STATUS=""
+CALL_REASON=""
+
+work_dir="$(mktemp -d "${TMPDIR:-/tmp}/skill-aws-reach.XXXXXX")" || finish_static "作業ディレクトリを作れません"
+trap 'rm -rf "$work_dir"' EXIT
+trap 'exit 143' TERM INT HUP
+calls_file="$work_dir/calls.jsonl"
+: >"$calls_file"
+
+target="$(jq -n \
+  --arg name "$opt_name" --arg arn "$opt_arn" --arg id "$opt_id" --arg alias "$opt_alias" \
+  --arg cluster "$opt_cluster" --arg service "$opt_service" --arg zone_id "$opt_zone_id" \
+  '$ARGS.named | with_entries(select(.value != ""))')" || finish_static "対象の組み立てに失敗しました"
+checked_at="$(date -u +%Y-%m-%dT%H:%M:%SZ)" || checked_at=""
+
+finish() {
+  local status="$1" reason="${2:-}" result="${3:-}" out
+  case "$status" in
+    ok|partial)
+      if ! printf '%s' "$result" | jq -e 'type == "object"' >/dev/null 2>&1; then
+        status=failed
+        reason="結果の組み立てに失敗しました"
+        result=null
+      fi
+      ;;
+    *) result=null ;;
+  esac
+  out="$(jq -n \
+    --arg status "$status" --arg query "$query" --argjson target "$target" \
+    --arg account "$account" --arg region "$region" --arg checked_at "$checked_at" \
+    --slurpfile calls "$calls_file" --argjson result "$result" --arg reason "$reason" \
+    '{status: $status, query: $query, target: $target,
+      account: (if $account == "" then null else $account end),
+      region: (if $region == "" then null else $region end),
+      checked_at: (if $checked_at == "" then null else $checked_at end),
+      calls: $calls, result: $result,
+      reason: (if $reason == "" then null else $reason end)}')" || finish_static "出力の組み立てに失敗しました"
+  printf '%s\n' "$out"
+  exit 0
+}
+
+finish_result() {
+  if [ -n "$partial_reason" ]; then
+    finish partial "$partial_reason" "${1:-}"
+  fi
+  finish ok "" "${1:-}"
+}
+
+# $(...) の中で finish を呼ぶと exit がサブシェルで止まり、本体が続行して status=ok になるので、
+# jq の結果は必ずこの関数で変数へ受ける。使い方: jqv <var> <jq の引数...>
+jqv() {
+  local __var="$1" __out
+  shift
+  __out="$(jq "$@")" || finish failed "応答の解釈に失敗しました"
+  printf -v "$__var" '%s' "$__out"
+}
+
+if [ -z "$profile" ]; then
+  finish unconfigured "SKILL_AWS_REACH_PROFILE が未設定です（メタデータ専用ロールのプロファイルを宣言してください）"
+fi
+
+case "$profile" in -*) usage "SKILL_AWS_REACH_PROFILE が - で始まっています" ;; esac
+[[ $profile =~ ^[A-Za-z0-9._@:/+=-]{1,128}$ ]] || usage "SKILL_AWS_REACH_PROFILE の値が不正です"
+
+if ! command -v aws >/dev/null 2>&1; then
+  finish failed "aws コマンドが見つかりません"
+fi
+
+re_unauthenticated='ExpiredToken|Token has expired|SSO session.*expired|Unable to locate credentials|InvalidClientTokenId|UnrecognizedClientException|The config profile \(.*\) could not be found'
+re_denied='AccessDenied|UnauthorizedOperation|not authorized to perform'
+re_not_found='NotFound|ResourceNotFoundException|NoSuchDistribution'
+re_error_code='An error occurred \(([A-Za-z0-9._]+)\)'
+
+# stderr の文言で分類する。aws の終了コードは種別を区別できない。
+classify() {
+  local e="$1"
+  if [[ $e =~ $re_unauthenticated ]]; then echo unauthenticated
+  elif [[ $e =~ $re_denied ]]; then echo denied
+  elif [[ $e =~ $re_not_found ]]; then echo not_found
+  else echo failed
+  fi
+}
+
+# aws は配列引数で起動し、シェル文字列を組み立てない。周辺の AWS_ 環境変数（資格情報・プロファイル・
+# 設定ファイル・エンドポイントの差し替え）を消すのは、書き込み権限付きの資格情報を拾ったり別の宛先へ
+# 向いたりして、宣言したプロファイルの制限が効かなくなるのを防ぐため。
+# AWS_CA_BUNDLE だけ残すのは、社内の TLS 中継で証明書の差し替えが要る環境があり、消すと全呼び出しが失敗するため。
+aws_env_unset=()
+while IFS= read -r env_name; do
+  case "$env_name" in
+    AWS_CA_BUNDLE|AWS_PAGER) ;;
+    AWS_*) aws_env_unset+=(-u "$env_name") ;;
+  esac
+done <<<"$(compgen -e)"
+
+# 第 1 引数はリージョンの上書き（空なら既定）。使い方: aws_call "" <service> <operation> [args...]
+# 応答が JSON オブジェクト 1 つでなければ、終了コードが 0 でも failed にする。
+aws_call() {
+  local region_override="$1" service="$2" op="$3"; shift 3
+  local out err code=0 use_region region_args=() text detail=""
+  call_seq=$((call_seq + 1))
+  out="$work_dir/out.$call_seq"
+  err="$work_dir/err.$call_seq"
+  use_region="${region_override:-$region}"
+  [ -z "$use_region" ] || region_args=(--region "$use_region")
+  env ${aws_env_unset[@]+"${aws_env_unset[@]}"} AWS_PAGER= \
+    aws --profile "$profile" --output json --cli-connect-timeout 10 --cli-read-timeout 30 \
+    ${region_args[@]+"${region_args[@]}"} "$service" "$op" "$@" \
+    >"$out" 2>"$err" </dev/null || code=$?
+  CALL_OUT="$out"
+  CALL_REASON=""
+  if [ "$code" -eq 0 ]; then
+    if jq -e -s 'length == 1 and (.[0] | type == "object")' "$out" >/dev/null 2>&1; then
+      CALL_STATUS=ok
+      jq -nc --arg api "$service $op" '{api: $api, status: "ok"}' >>"$calls_file"
+      return 0
+    fi
+    CALL_STATUS=failed
+    CALL_REASON="$service $op: failed（応答が空か JSON オブジェクトではない）"
+  else
+    text="$(<"$err")"
+    CALL_STATUS="$(classify "$text")"
+    if [[ $text =~ $re_error_code ]]; then detail="（エラーコード: ${BASH_REMATCH[1]}）"; fi
+    CALL_REASON="$service $op: $CALL_STATUS$detail"
+  fi
+  jq -nc --arg api "$service $op" --arg status "$CALL_STATUS" --arg reason "$CALL_REASON" \
+    '{api: $api, status: $status, reason: $reason}' >>"$calls_file"
+}
+
+primary() {
+  aws_call "$@"
+  [ "$CALL_STATUS" = ok ] || finish "$CALL_STATUS" "$CALL_REASON"
+}
+
+note_partial() {
+  partial_reason="${partial_reason:+$partial_reason; }$1"
+}
+
+if [ -z "$region" ]; then
+  profile_region="$(env ${aws_env_unset[@]+"${aws_env_unset[@]}"} AWS_PAGER= \
+    aws configure get region --profile "$profile" 2>/dev/null </dev/null)" || profile_region=""
+  if [[ $profile_region =~ $re_region ]]; then region="$profile_region"; fi
+fi
+
+# shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+waf_def='
+def overrides_of(st): [st | (.ManagedRuleGroupStatement, .RuleGroupReferenceStatement) | select(. != null) | (
+  ((.RuleActionOverrides // [])[] | {name: .Name, action: ((.ActionToUse // {}) | keys[0])}),
+  ((.ExcludedRules // [])[] | {name: .Name, action: "Count"}))];
+def fm_groups: [((.PreProcessFirewallManagerRuleGroups // [])[], (.PostProcessFirewallManagerRuleGroups // [])[])
+  | {name: .Name, priority: .Priority, override_action: ((.OverrideAction // {}) | keys[0]),
+     rule_action_overrides: overrides_of(.FirewallManagerStatement // {})}];
+def waf: if . == null then null else {
+  name: .Name,
+  default_action: ((.DefaultAction // {}) | keys[0]),
+  rules: [(.Rules // [])[] | {
+    name: .Name,
+    priority: .Priority,
+    action: ((.Action // {}) | keys[0]),
+    override_action: ((.OverrideAction // {}) | keys[0]),
+    statement_types: ([(.Statement // {}) | keys[]] + [(.Statement.ManagedRuleGroupStatement.Name // empty)]),
+    rule_action_overrides: overrides_of(.Statement // {}),
+    has_scope_down: ([.Statement | .. | objects | select(has("ScopeDownStatement"))] | length > 0)
+  }],
+  firewall_manager_rule_groups: fm_groups
+} end;
+'
+
+primary "" sts get-caller-identity
+jqv account -r '.Account // ""' "$CALL_OUT"
+
+if [ -n "${SKILL_AWS_REACH_ACCOUNTS:-}" ]; then
+  allowed=0
+  IFS=, read -r -a allowed_accounts <<<"$SKILL_AWS_REACH_ACCOUNTS"
+  for a in "${allowed_accounts[@]}"; do
+    a="${a// /}"
+    if [ -n "$a" ] && [ "$a" = "$account" ]; then allowed=1; fi
+  done
+  [ "$allowed" -eq 1 ] || finish refused "呼び出し元のアカウントが SKILL_AWS_REACH_ACCOUNTS に含まれていません"
+fi
+
+q_whoami() {
+  local result
+  jqv result -c '{account: .Account, arn: .Arn}' "$CALL_OUT"
+  finish_result "$result"
+}
+
+q_lb() {
+  local lb lb_arn lb_type listeners_json=null waf_json=null listener rules larn result
+  if has name; then
+    primary "" elbv2 describe-load-balancers --names "$opt_name"
+  else
+    primary "" elbv2 describe-load-balancers --load-balancer-arns "$opt_arn"
+  fi
+  jqv lb -c '.LoadBalancers[0] // empty' "$CALL_OUT"
+  [ -n "$lb" ] || finish not_found "ロードバランサーが見つかりません"
+  jqv lb_arn -r '.LoadBalancerArn // ""' <<<"$lb"
+  jqv lb_type -r '.Type // ""' <<<"$lb"
+  [ -n "$lb_arn" ] || finish failed "応答に LoadBalancerArn がありません"
+
+  aws_call "" elbv2 describe-listeners --load-balancer-arn "$lb_arn"
+  if [ "$CALL_STATUS" = ok ]; then
+    jq -c '.Listeners[]?' "$CALL_OUT" >"$work_dir/listeners.ndjson" || finish failed "応答の解釈に失敗しました"
+    : >"$work_dir/listeners.out"
+    while IFS= read -r listener; do
+      jqv larn -r '.ListenerArn // ""' <<<"$listener"
+      rules=null
+      aws_call "" elbv2 describe-rules --listener-arn "$larn"
+      if [ "$CALL_STATUS" = ok ]; then
+        # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+        jqv rules -c '[(.Rules // [])[] | select(.IsDefault != true) | {
+          priority: .Priority,
+          conditions: [(.Conditions // [])[] | {
+            field: .Field,
+            values: (if (.Field as $f | ["host-header", "path-pattern", "http-request-method", "source-ip"] | index($f)) != null
+              then (.Values // .HostHeaderConfig.Values // .PathPatternConfig.Values
+                // .HttpRequestMethodConfig.Values // .SourceIpConfig.Values // [])
+              else [] end),
+            header_name: (.HttpHeaderConfig.HttpHeaderName // null)
+          }],
+          actions: [(.Actions // [])[].Type]
+        }]' "$CALL_OUT"
+      else
+        note_partial "$CALL_REASON"
+      fi
+      # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+      jq -c --argjson rules "$rules" \
+        '{port: .Port, protocol: .Protocol, default_actions: [(.DefaultActions // [])[].Type], rules: $rules}' \
+        <<<"$listener" >>"$work_dir/listeners.out" || finish failed "応答の解釈に失敗しました"
+    done <"$work_dir/listeners.ndjson"
+    jqv listeners_json -sc '.' "$work_dir/listeners.out"
+  else
+    note_partial "$CALL_REASON"
+  fi
+
+  if [ "$lb_type" = application ]; then
+    aws_call "" wafv2 get-web-acl-for-resource --resource-arn "$lb_arn"
+    if [ "$CALL_STATUS" = ok ]; then
+      jqv waf_json -c "$waf_def (.WebACL // null) | waf" "$CALL_OUT"
+    else
+      note_partial "$CALL_REASON"
+    fi
+  fi
+
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  result="$(jq -c --argjson listeners "$listeners_json" --argjson waf "$waf_json" '{
+    name: .LoadBalancerName, type: .Type, scheme: .Scheme, dns_name: .DNSName,
+    security_groups: (.SecurityGroups // []),
+    subnets: [(.AvailabilityZones // [])[].SubnetId],
+    listeners: $listeners, waf: $waf}' <<<"$lb")" || finish failed "応答の解釈に失敗しました"
+  finish_result "$result"
+}
+
+q_sg() {
+  local count result
+  primary "" ec2 describe-security-group-rules --filters "Name=group-id,Values=$opt_id"
+  jqv count '(.SecurityGroupRules // []) | length' "$CALL_OUT"
+  [ "$count" -gt 0 ] || finish not_found "セキュリティグループが見つかりません"
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  jqv result -c --arg id "$opt_id" '{group_id: $id, ingress: [(.SecurityGroupRules // [])[] | select(.IsEgress == false) | {
+    protocol: .IpProtocol, from_port: .FromPort, to_port: .ToPort,
+    cidr_ipv4: (.CidrIpv4 // null), cidr_ipv6: (.CidrIpv6 // null),
+    prefix_list_id: (.PrefixListId // null),
+    referenced_group_id: (.ReferencedGroupInfo.GroupId // null)}]}' "$CALL_OUT"
+  finish_result "$result"
+}
+
+q_subnet() {
+  local subnet vpc rt="" rt_json=null result
+  primary "" ec2 describe-subnets --subnet-ids "$opt_id"
+  jqv subnet -c '.Subnets[0] // empty' "$CALL_OUT"
+  [ -n "$subnet" ] || finish not_found "サブネットが見つかりません"
+  jqv vpc -r '.VpcId // ""' <<<"$subnet"
+
+  aws_call "" ec2 describe-route-tables --filters "Name=association.subnet-id,Values=$opt_id"
+  if [ "$CALL_STATUS" = ok ]; then
+    jqv rt -c '.RouteTables[0] // empty' "$CALL_OUT"
+    if [ -z "$rt" ]; then
+      aws_call "" ec2 describe-route-tables --filters "Name=vpc-id,Values=$vpc" "Name=association.main,Values=true"
+      if [ "$CALL_STATUS" = ok ]; then jqv rt -c '.RouteTables[0] // empty' "$CALL_OUT"; fi
+    fi
+  fi
+  if [ -z "$rt" ]; then
+    [ "$CALL_STATUS" != ok ] || CALL_REASON="ec2 describe-route-tables: route table が見つかりません"
+    note_partial "$CALL_REASON"
+  else
+    # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+    jqv rt_json -c '
+      def target: (.GatewayId // .NatGatewayId // .TransitGatewayId // .VpcPeeringConnectionId
+        // .NetworkInterfaceId // .InstanceId // .EgressOnlyInternetGatewayId // .CarrierGatewayId
+        // .LocalGatewayId // .VpcEndpointId // null);
+      ([(.Routes // [])[] | select((.DestinationCidrBlock == "0.0.0.0/0" or .DestinationIpv6CidrBlock == "::/0")
+        and .State != "blackhole")] | sort_by(.DestinationCidrBlock == null) | map(target) | map(select(. != null))) as $t
+      | {route_table_id: .RouteTableId, default_route_target: ($t[0] // null), public: ($t | any(startswith("igw-")))}' <<<"$rt"
+  fi
+
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  result="$(jq -c --argjson rt "$rt_json" '{
+    subnet_id: .SubnetId, vpc_id: .VpcId, map_public_ip_on_launch: .MapPublicIpOnLaunch,
+    route_table_id: $rt.route_table_id,
+    default_route_target: $rt.default_route_target,
+    public: $rt.public}' <<<"$subnet")" || finish failed "応答の解釈に失敗しました"
+  finish_result "$result"
+}
+
+q_cloudfront() {
+  local id="$opt_id" matches count waf_id waf_name waf_acl_id waf_json=null cf_out result
+  if has alias; then
+    primary "" cloudfront list-distributions
+    # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+    jqv matches -c --arg a "$opt_alias" '[(.DistributionList.Items // [])[]
+      | select([(.Aliases.Items // [])[] | ascii_downcase] | index($a | ascii_downcase)) | .Id]' "$CALL_OUT"
+    jqv count 'length' <<<"$matches"
+    [ "$count" -gt 0 ] || finish not_found "エイリアスに一致するディストリビューションがありません"
+    jqv id -r '.[0]' <<<"$matches"
+  fi
+  primary "" cloudfront get-distribution-config --id "$id"
+  cf_out="$CALL_OUT"
+
+  jqv waf_id -r '.DistributionConfig.WebACLId // ""' "$cf_out"
+  if [ -n "$waf_id" ]; then
+    if [[ $waf_id =~ :wafv2:.*/webacl/([A-Za-z0-9._-]+)/([A-Za-z0-9-]+)$ ]]; then
+      waf_name="${BASH_REMATCH[1]}"
+      waf_acl_id="${BASH_REMATCH[2]}"
+      aws_call us-east-1 wafv2 get-web-acl --scope CLOUDFRONT --name "$waf_name" --id "$waf_acl_id"
+      if [ "$CALL_STATUS" = ok ]; then
+        jqv waf_json -c "$waf_def (.WebACL // null) | waf" "$CALL_OUT"
+      else
+        note_partial "$CALL_REASON"
+      fi
+    else
+      jq -nc '{api: "wafv2 get-web-acl", status: "failed", reason: "WebACLId が wafv2 の ARN ではないため読めません"}' >>"$calls_file"
+      note_partial "wafv2 get-web-acl: WebACLId が wafv2 の ARN ではないため読めません"
+    fi
+  fi
+
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  jqv result -c --arg id "$id" --argjson waf "$waf_json" '.DistributionConfig | {
+    id: $id, enabled: .Enabled,
+    aliases: (.Aliases.Items // []),
+    origins: [(.Origins.Items // [])[] | {
+      id: .Id, domain: .DomainName,
+      origin_access_control_id: (.OriginAccessControlId | if . == "" then null else . end),
+      custom_header_names: [(.CustomHeaders.Items // [])[].HeaderName]}],
+    default_behavior: {target_origin_id: .DefaultCacheBehavior.TargetOriginId,
+      viewer_protocol_policy: .DefaultCacheBehavior.ViewerProtocolPolicy},
+    behaviors: [(.CacheBehaviors.Items // [])[] | {path_pattern: .PathPattern, target_origin_id: .TargetOriginId}],
+    waf: $waf}' "$cf_out"
+  finish_result "$result"
+}
+
+q_apigw_rest() {
+  local id="$opt_id" api matches count authorizers=null methods=null result
+  if has name; then
+    primary "" apigateway get-rest-apis
+    # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+    jqv matches -c --arg n "$opt_name" '[(.items // [])[] | select(.name == $n) | .id]' "$CALL_OUT"
+    jqv count 'length' <<<"$matches"
+    [ "$count" -gt 0 ] || finish not_found "名前に一致する REST API がありません"
+    [ "$count" -eq 1 ] || finish failed "名前に一致する REST API が複数あります（--id で指定してください）"
+    jqv id -r '.[0]' <<<"$matches"
+  fi
+  primary "" apigateway get-rest-api --rest-api-id "$id"
+  jqv api -c '.' "$CALL_OUT"
+
+  aws_call "" apigateway get-authorizers --rest-api-id "$id"
+  if [ "$CALL_STATUS" = ok ]; then
+    jqv authorizers -c '[(.items // [])[] | {id: .id, name: .name, type: .type}]' "$CALL_OUT"
+  else
+    note_partial "$CALL_REASON"
+  fi
+
+  aws_call "" apigateway get-resources --rest-api-id "$id" --embed methods
+  if [ "$CALL_STATUS" = ok ]; then
+    # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+    jqv methods -c '[(.items // [])[] | .path as $p | (.resourceMethods // {}) | to_entries[] | {
+      path: $p, http_method: (.value.httpMethod // .key),
+      authorization_type: (.value.authorizationType // null),
+      authorizer_id: (.value.authorizerId // null),
+      api_key_required: (.value.apiKeyRequired // false)}]' "$CALL_OUT"
+  else
+    note_partial "$CALL_REASON"
+  fi
+
+  # ポリシーを JSON として読めないときだけ正規表現で走査する。ARN 中の aws: を拾わないよう arn: の直後を除く。
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  result="$(jq -c --argjson authorizers "$authorizers" --argjson methods "$methods" '{
+    id: .id, name: .name,
+    endpoint_types: (.endpointConfiguration.types // []),
+    vpc_endpoint_ids: (.endpointConfiguration.vpcEndpointIds // []),
+    has_resource_policy: ((.policy // "") != ""),
+    policy_condition_keys: ((.policy // "") as $p
+      | try ([$p | fromjson | .Statement | (if type == "array" then .[] else . end)
+          | (.Condition // {}) | .[] | keys[]] | unique)
+        catch ([$p | scan("(?<!arn:)aws:[A-Za-z]+")] | unique)),
+    authorizers: $authorizers, methods: $methods}' <<<"$api")" || finish failed "応答の解釈に失敗しました"
+  finish_result "$result"
+}
+
+q_apigw_http() {
+  local id="$opt_id" api matches count routes=null authorizers=null result
+  if has name; then
+    primary "" apigatewayv2 get-apis
+    # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+    jqv matches -c --arg n "$opt_name" '[(.Items // [])[] | select(.Name == $n) | .ApiId]' "$CALL_OUT"
+    jqv count 'length' <<<"$matches"
+    [ "$count" -gt 0 ] || finish not_found "名前に一致する HTTP API がありません"
+    [ "$count" -eq 1 ] || finish failed "名前に一致する HTTP API が複数あります（--id で指定してください）"
+    jqv id -r '.[0]' <<<"$matches"
+  fi
+  primary "" apigatewayv2 get-api --api-id "$id"
+  jqv api -c '.' "$CALL_OUT"
+
+  aws_call "" apigatewayv2 get-routes --api-id "$id"
+  if [ "$CALL_STATUS" = ok ]; then
+    jqv routes -c '[(.Items // [])[] | {route_key: .RouteKey, authorization_type: (.AuthorizationType // null),
+      authorizer_id: (.AuthorizerId // null)}]' "$CALL_OUT"
+  else
+    note_partial "$CALL_REASON"
+  fi
+
+  aws_call "" apigatewayv2 get-authorizers --api-id "$id"
+  if [ "$CALL_STATUS" = ok ]; then
+    jqv authorizers -c '[(.Items // [])[] | {id: .AuthorizerId, name: .Name, type: .AuthorizerType}]' "$CALL_OUT"
+  else
+    note_partial "$CALL_REASON"
+  fi
+
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  result="$(jq -c --argjson routes "$routes" --argjson authorizers "$authorizers" '{
+    id: .ApiId, name: .Name, protocol_type: .ProtocolType,
+    disable_execute_api_endpoint: (.DisableExecuteApiEndpoint // false),
+    routes: $routes, authorizers: $authorizers}' <<<"$api")" || finish failed "応答の解釈に失敗しました"
+  finish_result "$result"
+}
+
+q_lambda_url() {
+  local result
+  aws_call "" lambda get-function-url-config --function-name "$opt_name"
+  case "$CALL_STATUS" in
+    ok) ;;
+    not_found) finish not_found "$CALL_REASON; 修飾子なし（\$LATEST）の URL 設定だけを引いた。alias に付けた URL は対象外" ;;
+    *) finish "$CALL_STATUS" "$CALL_REASON" ;;
+  esac
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  jqv result -c --arg name "$opt_name" '{function_name: $name, auth_type: .AuthType,
+    has_cors: ((.Cors // {}) | length > 0), invoke_mode: (.InvokeMode // null)}' "$CALL_OUT"
+  finish_result "$result"
+}
+
+q_ecs_service() {
+  local count result
+  primary "" ecs describe-services --cluster "$opt_cluster" --services "$opt_service"
+  jqv count '(.services // []) | length' "$CALL_OUT"
+  [ "$count" -gt 0 ] || finish not_found "ECS サービスが見つかりません"
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  jqv result -c --arg cluster "$opt_cluster" --arg service "$opt_service" '.services[0] | {
+    cluster: $cluster, service: $service,
+    launch_type: (.launchType // null),
+    assign_public_ip: (.networkConfiguration.awsvpcConfiguration.assignPublicIp // null),
+    subnets: (.networkConfiguration.awsvpcConfiguration.subnets // []),
+    security_groups: (.networkConfiguration.awsvpcConfiguration.securityGroups // []),
+    load_balancers: [(.loadBalancers // [])[] | {target_group_arn: .targetGroupArn,
+      container_name: .containerName, container_port: .containerPort}]}' "$CALL_OUT"
+  finish_result "$result"
+}
+
+q_dns() {
+  local zones count zone zone_id norm result
+  primary "" route53 list-hosted-zones
+  # 最長一致が同じ長さで複数あるのは public と private の同名ゾーンなど。どちらが正かは決められないので選ばない。
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  jqv zones -c --arg n "$opt_name" --arg z "$opt_zone_id" '
+    ($n | ascii_downcase | if endswith(".") then . else . + "." end) as $n
+    | [(.HostedZones // [])[] | {id: (.Id | sub("^/hostedzone/"; "")), name: (.Name | ascii_downcase),
+        private: (.Config.PrivateZone // false)}]
+    | map(select(if $z != "" then .id == $z else (.name as $zn | $n == $zn or ($n | endswith("." + $zn))) end))
+    | (map(.name | length) | max) as $m
+    | map(select((.name | length) == $m))' "$CALL_OUT"
+  jqv count 'length' <<<"$zones"
+  [ "$count" -gt 0 ] || finish not_found "名前に対応するホストゾーンが見つかりません"
+  [ "$count" -eq 1 ] || finish failed "名前に一致するホストゾーンが複数あります（--zone-id で指定してください）"
+  jqv zone -c '.[0]' <<<"$zones"
+  jqv zone_id -r '.id' <<<"$zone"
+  jqv norm -Rr 'ascii_downcase | if endswith(".") then . else . + "." end' <<<"$opt_name"
+
+  primary "" route53 list-resource-record-sets --hosted-zone-id "$zone_id" --start-record-name "$norm" --max-items 100
+  # shellcheck disable=SC2016  # jq のソースなので $ をシェルに展開させない
+  jqv result -c --argjson zone "$zone" --arg n "$norm" '[(.ResourceRecordSets // [])[]
+    | select((.Name | ascii_downcase) == $n)
+    | {name: .Name, type: .Type, alias_target_dns: (.AliasTarget.DNSName // null),
+       values: [(.ResourceRecords // [])[].Value]}] as $records
+    | {zone_id: $zone.id, zone_name: $zone.name, private_zone: $zone.private, records: $records}' "$CALL_OUT"
+  jqv count '.records | length' <<<"$result"
+  [ "$count" -gt 0 ] || finish not_found "名前に一致するレコードがありません"
+  finish_result "$result"
+}
+
+case "$query" in
+  whoami)      q_whoami ;;
+  lb)          q_lb ;;
+  sg)          q_sg ;;
+  subnet)      q_subnet ;;
+  cloudfront)  q_cloudfront ;;
+  apigw-rest)  q_apigw_rest ;;
+  apigw-http)  q_apigw_http ;;
+  lambda-url)  q_lambda_url ;;
+  ecs-service) q_ecs_service ;;
+  dns)         q_dns ;;
+esac

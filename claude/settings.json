@@ -6,6 +6,7 @@
     "allow": [
       "Bash(git rev-list:*)",
       "Bash(go build:*)",
+      "Bash(skill-aws-reach:*)",
       "WebFetch(domain:play.google.com)"
     ]
   },
@@ -69,7 +70,8 @@
       "git push *",
       "node *codex-companion.mjs*",
       "skill-cross-review *",
-      "skill-review-state *"
+      "skill-review-state *",
+      "skill-aws-reach *"
     ]
   },
   "modelSettings": {
