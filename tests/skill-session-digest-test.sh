@@ -3,7 +3,7 @@
 # skill-session-digest の集約結果を fixture で固定する。実ログ（~/.claude・~/.cursor・
 # ~/.codex）は日々変わるうえ社内固有名を含むため、テスト入力には使わない。
 #
-# mktemp を使うので、書き込み先を制限したサンドボックス下では実行できない。
+# mktemp を使うので、書き込み先を制限したサンドボックス下では $TMPDIR 以外に作れない。
 # 「Operation not permitted」で落ちた場合はテストの不具合ではなく実行環境の制約。
 
 set -euo pipefail
@@ -11,7 +11,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 REPO_ROOT="$(git -C "$SCRIPT_DIR" rev-parse --show-toplevel)"
 DIGEST="$REPO_ROOT/bin/skill-session-digest"
-FIXTURE_ROOT="$(mktemp -d -t skill-session-digest-test)"
+FIXTURE_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/skill-session-digest-test.XXXXXX")"
 trap 'rm -rf "$FIXTURE_ROOT"' EXIT
 
 CLAUDE_ROOT="$FIXTURE_ROOT/claude"
