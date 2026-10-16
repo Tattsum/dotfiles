@@ -29,6 +29,12 @@ link_file "$DOTFILES_DIR/claude/agents/Explore.md" "$HOME/.claude/agents/Explore
 
 echo ""
 echo "------------------------------"
+echo "🔐 Claude Code の SSL_CERT_FILE が指す CA バンドルを生成します..."
+echo "------------------------------"
+"$DOTFILES_DIR/bin/build-ca-bundle"
+
+echo ""
+echo "------------------------------"
 echo "🤖 Codex の運用ルールをリンクします..."
 echo "------------------------------"
 # Claude Code と Codex で運用ルールの正本を共有する。Codex は

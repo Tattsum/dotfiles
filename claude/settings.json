@@ -1,7 +1,7 @@
 {
   "env": {
     "CLAUDE_CODE_SUBAGENT_MODEL": "sonnet",
-    "SSL_CERT_FILE": "/etc/ssl/cert.pem"
+    "SSL_CERT_FILE": "/Users/tatsuma.kano/.config/ssl/ca-bundle.pem"
   },
   "permissions": {
     "allow": [

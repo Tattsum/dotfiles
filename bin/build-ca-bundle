@@ -1,0 +1,33 @@
+#!/usr/bin/env bash
+
+set -euo pipefail
+
+OUTPUT="${1:-$HOME/.config/ssl/ca-bundle.pem}"
+SYSTEM_BUNDLE="/etc/ssl/cert.pem"
+
+# SYSTEM_BUNDLE をそのまま SSL_CERT_FILE に指さないのは、キーチェーンにだけ入っている mkcert の
+# ルート CA が Go / OpenSSL 系から信頼されなくなるため。秘密鍵（rootCA-key.pem）は読まない。
+# SYSTEM_BUNDLE は macOS の更新で変わるが、ここで作ったファイルは追従しない。OS 更新後は再実行する。
+mkcert_root=""
+if command -v mkcert >/dev/null 2>&1; then
+  caroot="$(mkcert -CAROOT)"
+  if [ -r "$caroot/rootCA.pem" ]; then
+    mkcert_root="$caroot/rootCA.pem"
+  fi
+fi
+
+mkdir -p "$(dirname "$OUTPUT")"
+# 出力先へ直接書かない。Go は SSL_CERT_FILE が空・書きかけ・不在だとシステムの検証に戻らず、
+# sandbox の外も含めてすべての TLS 検証に失敗するため、書き終えてから mv で置き換える。
+tmp="$(mktemp "$(dirname "$OUTPUT")/.ca-bundle.XXXXXX")"
+trap 'rm -f "$tmp"' EXIT
+cat "$SYSTEM_BUNDLE" >"$tmp"
+if [ -n "$mkcert_root" ]; then
+  printf '\n' >>"$tmp"
+  cat "$mkcert_root" >>"$tmp"
+fi
+chmod 644 "$tmp"
+mv -f "$tmp" "$OUTPUT"
+trap - EXIT
+
+echo "  ✅ $OUTPUT を生成しました（mkcert のルート CA: ${mkcert_root:-なし}）"
