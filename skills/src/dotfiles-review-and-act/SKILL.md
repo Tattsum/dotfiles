@@ -23,7 +23,7 @@ PR をレビューし、**所有者で次アクションを振り分ける**エ�
 
 ### 1. 対象 PR の解決と所有者判定
 
-次の2つを**それぞれ単独の Bash 呼び出し**で実行する（並列可。1つにまとめると sandbox の `gh *` 除外が効かず TLS 検証で失敗する）。
+次の2つを**それぞれ単独の Bash 呼び出し**で実行する（並列可。1つにまとめると sandbox の `gh *` 除外が効かず sandbox 内で動いて失敗する）。
 
 認証中の自分のアカウント:
 
@@ -181,7 +181,7 @@ skill-resolve-diff --base <base>
 
 スレッドの解決状態（isResolved / isOutdated）・レビュー要約・会話欄コメントを正規化 JSON で取得する。REST の pulls/{pr}/comments だけでは isResolved が取れず、人間が「対応不要」と解決済みにした論点を検出できない。会話欄（issue_comments）に「対応不要」が書かれることもあり、レビュー要約（reviews）には inline に紐づかない指摘（gemini-code-assist の "Code Review" 等）が入るため、いずれも同時に取得する。
 
-**単独の Bash 呼び出し**で実行し、`jq` などへパイプしない（パイプやリダイレクトを付けると sandbox の `skill-review-state *` 除外が外れ、中の gh が TLS 検証で失敗する）。絞り込みが要るなら、長い出力が保存されたファイルに別の呼び出しで `jq` をかける。
+**単独の Bash 呼び出し**で実行し、`jq` などへパイプしない（パイプやリダイレクトを付けると sandbox の `skill-review-state *` 除外が外れ、中の gh が sandbox 内で動いて失敗する）。絞り込みが要るなら、長い出力が保存されたファイルに別の呼び出しで `jq` をかける。
 
 ```bash
 skill-review-state <owner/repo> <pr番号>

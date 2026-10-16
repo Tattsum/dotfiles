@@ -15,7 +15,7 @@ skill-cross-review --from <claude|codex> --base <base>
 
 - `--from` には**自分が何者かを自己申告**する。Claude Code なら `claude`、Codex なら `codex`。環境変数（`CLAUDECODE` 等）から推測しない。Claude Code から起動された Codex のシェルにも `CLAUDECODE=1` が継承されるため、環境変数で判定すると呼び返しの往復が起きる。
 - `--base` には `skill-resolve-diff` が返した `base` をそのまま渡す（base の解決をここで重複させない）。
-- **単独のコマンドとして実行する**（パイプ・リダイレクト・`&&`・`$(...)` を付けない）。Claude Code では sandbox の `skill-cross-review *` 除外が単独コマンドにしか効かず、付けると codex が入れ子の Seatbelt で起動できない。
+- **単独のコマンドとして実行する**（パイプ・リダイレクト・`&&`・`$(...)`・環境変数の前置を付けない）。Claude Code では sandbox の `skill-cross-review *` 除外が単独コマンドにしか効かず、付けると codex が入れ子の Seatbelt で起動できない。
 - **Claude Code**: Bash の `run_in_background: true` で、focus サブエージェントの一斉起動と**同じアシスタントメッセージ**で起動する。相手のレビューは数分かかるため、逐次にすると全体の待ち時間がそのぶん伸びる。統合の前に完了通知を待って出力を読む。
 - **Codex**: sandbox 外実行（escalation）を要求して実行する。`claude` は Anthropic API へのネットワーク接続と `~/.claude` への書き込みを要し、Codex の sandbox 内では必ず失敗する。相手のレビューは最大 `--timeout`（既定 900 秒）かかるので、コマンドの待ち時間を短く切らない。
 - 時間制限と、呼ばれた側がさらに相手を呼び返す入れ子の防止はスクリプト側が持つ。呼び出し側で再実装しない。

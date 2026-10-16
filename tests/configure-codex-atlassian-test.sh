@@ -3,7 +3,7 @@
 set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/.." && pwd)"
-TEST_ROOT="$(mktemp -d)"
+TEST_ROOT="$(mktemp -d "${TMPDIR:-/tmp}/configure-codex-atlassian-test.XXXXXX")"
 FAKE_BIN="$TEST_ROOT/bin"
 CALL_LOG="$TEST_ROOT/calls.log"
 FAKE_STATE="$TEST_ROOT/state"

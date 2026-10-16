@@ -55,7 +55,8 @@
 - **モダン CLI は旧ツールと構文・出力が異なる**（`sd`≠`sed`、`bat` はページャ・装飾付き、`fd`≠`find`）。各ツールの**ネイティブ構文**で正しく使い、GNU/BSD 構文をそのまま渡さない
 - 対話シェルのエイリアスのため `cat`/`find`/`sed` 等はモダン CLI に解決される。**スクリプト・機械可読出力で GNU/POSIX の決定的挙動が必要な場合のみ** `command sed` のように実体を明示する（ページャ回避は `bat --paging=never`、素の連結は `command cat`）
 - 破壊系の確認エイリアス（`rm -i` / `cp -i` / `mv -i`）を尊重する。非対話で確認を避けたい場合は意図を明示してフラグや実体で対応する
-- **`gh` は単独コマンドで実行する**。sandbox 内では gh の TLS 検証が失敗する（`x509: OSStatus -26276`）ため、`sandbox.excludedCommands` の `gh *` で sandbox 外へ逃がしているが、除外が効くのは単独コマンドのときだけ。パイプ・`&&` / `;` / `||`・`$(gh ...)`・ループ・ファイルへのリダイレクト（`>`）のどれかを含むと sandbox 内に戻って失敗する（`2>&1` は可）。整形・絞り込みは `--jq` / `-q` / `--limit` など gh 自身のオプションで行い、複数件は1件ずつ別の Bash 呼び出し（並列可）にする。別リポジトリは `cd` せず `--repo owner/repo`（`-R`）で指定する。`gh run view --log` や `gh pr diff` のような JSON 以外の出力も単独で実行し、絞り込みは長い出力が保存されたファイルに対して別の呼び出しで `rg` をかける
+- **`gh` は単独コマンドで実行するのが基本**。`sandbox.excludedCommands` の `gh *` で sandbox 外で動くが、除外が効くのは単独コマンドのときだけ。パイプ・`&&` / `;` / `||`・`$(gh ...)`・ループ・ファイルへのリダイレクト（`>`）・環境変数の前置（`GH_PAGER= gh ...`）のどれかを含むと sandbox 内で動く（`2>&1` と `\` の行継続は可）。整形・絞り込みはまず `--jq` / `-q` / `--limit` など gh 自身のオプションで行い、複数件は1件ずつ別の Bash 呼び出し（並列可）にする。別リポジトリは `cd` せず `--repo owner/repo`（`-R`）で指定する
+- **パイプ等がどうしても要る gh は、Bash の `allowed_domains` に `api.github.com` を宣言して sandbox 内で実行する**（settings の `SSL_CERT_FILE` で sandbox 内でも gh の TLS 検証が通る）。`dangerouslyDisableSandbox` で再試行しない（auto mode に Safety Bypass として拒否される）。`api.github.com` を settings の常時許可には足さない（sandbox 内は審査なしで通りうるので、都度宣言して審査を受ける）。`gh run view --log` のようにログ・成果物を別ホストから取るものは単独で実行し、絞り込みは長い出力が保存されたファイルに対して別の呼び出しで `rg` をかける
 
 ---
 

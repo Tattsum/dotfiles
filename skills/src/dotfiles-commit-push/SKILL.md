@@ -35,7 +35,7 @@ git rev-parse --abbrev-ref HEAD
 gh repo view --json defaultBranchRef -q .defaultBranchRef.name
 ```
 
-gh が失敗したときだけ `git symbolic-ref --short refs/remotes/origin/HEAD` を実行し、先頭の `origin/` を除いた名前を `default` とする。`$(gh ...)` や `||` で1行にまとめない。そうすると sandbox の `gh *` 除外が効かず、gh が TLS 検証で毎回失敗する。
+gh が失敗したときだけ `git symbolic-ref --short refs/remotes/origin/HEAD` を実行し、先頭の `origin/` を除いた名前を `default` とする。`$(gh ...)` や `||` で1行にまとめない。そうすると sandbox の `gh *` 除外が効かず、gh が sandbox 内で動いて失敗する。
 
 `current` が固定リストまたは `default` に一致 → 保護ブランチ。**一致しなければ**（既に開発ブランチにいる）このセクションは skip し、通常のコミットへ進む。
 
