@@ -4,6 +4,8 @@ Use one block per subagent. Keep each subagent constrained to its assigned block
 
 各項目末尾の `§` は、yousukezan『Webアプリケーションセキュリティ入門』（<https://bogus.jp/webapp_security_review.pdf>）の節番号。`既存 TS-A` / `既存 PHP-B` 等は、このスキルへ統合して廃止した旧 review-ts-security / review-php-security の Focus A / B 由来。言語別の API 名は focus に書かず `sinks-<lang>.md` に置く。
 
+OWASP 出典を付けた項目は MASVS 索引のリンク先から補強した観点。分類と適用範囲は [owasp-masvs.md](owasp-masvs.md) を参照。
+
 ## Focus A: インジェクション（データが別のインタプリタで命令として解釈される境界）
 
 SQL・OS コマンド・テンプレートエンジン・XML パーサー・デシリアライザー・ログ行へ、信頼できない値が命令として渡る経路をレビューする。
@@ -96,6 +98,7 @@ Report only concrete authorization or contract gaps: name the entry point, the o
 - 再送・二重送信・キューの重複配信で、通知・ポイント・課金・Webhook などの副作用が増えないようにする。副作用は遷移が成功したとき（更新件数が 1 のとき、コミット後）だけ実行する。Idempotency-Key は同じキーで内容が違うリクエストを拒否し、DB の更新と同じトランザクションで記録する（§20.7, §20.8, §29.19）。
 - 価格・割引・税・合計・数量上限・所有者・承認者は、クライアントの値（hidden・readonly を含む）を使わず、サーバー側で再計算・決定する（§20.9）。
 - 有効期限はサーバーが保存した発行時刻と現在時刻で判定し、クライアントの時刻や hidden の値に任せない。確認画面の内容（宛先・金額）はサーバー側の取引に保存して実行時に照合する。ブロック・削除・在庫・価格などの関連状態は、最終的に変更する直前にも確認する（§20.12, §20.14）。
+- 取引ごとの承認が必要な操作では、ログイン認証と取引承認を区別する。承認を利用者・対象取引・金額や宛先などの確定内容に結び付け、内容変更時は承認を失効させる。期限・一回限りの利用・最終実行時の照合をサーバー側で保証し、承認済みフラグだけをクライアントから受け取らない（[OWASP Transaction Authorization](https://cheatsheetseries.owasp.org/cheatsheets/Transaction_Authorization_Cheat_Sheet.html)）。
 - 業務上の回数制限（クーポンは一人一回、招待や再設定メールの送信回数）は、通信量のレート制限とは別に、業務キーの一意制約・使用済み状態・時間あたりの上限で守る（§19.12, §20.13）。
 - 認可・在庫・外部の確認サービスの失敗や例外を許可側に倒さない（catch の中で許可を返す等）。例外を catch-all で握りつぶさない。途中で失敗したときの再試行の可否と戻し方を設計し、エラー応答でも状態が変わり得る前提で扱う（§20.15, 既存 PHP-B）。
 
@@ -115,16 +118,18 @@ Report only state, concurrency, or business-rule gaps where a concrete forbidden
 - 検証時と接続時で名前解決がずれないよう（DNS rebinding）、検証済みのアドレスへ接続するか、接続レイヤー（ダイヤラーのフック等）で検査する。リダイレクトは新しい宛先なので、自動追従を止めるか、各ホップに同じポリシーと回数上限を適用する（§15.14, §15.15）。
 - Sink は HTTP クライアントに限らない。ヘッドレスブラウザ、PDF・画像のレンダラー、フィードや文書のインポーター、XML パーサーの外部取得、SDK の Webhook も含める。Source も、DB に保存された URL・文書内の URL・キュー由来の値を含める（§15.8）。
 - 受信したリクエストの Cookie・Authorization・内部ヘッダーを、そのまま外部へ転送しない。秘密はクエリ文字列ではなくヘッダーで渡す（ログや履歴に残るため）。取得結果の本文・内部ヘッダー・詳細な接続エラー・解決済み IP を利用者へ返さない（§15.17, §15.19, 既存 TS-B）。
-- 外部 API の応答も信頼できない入力として扱う。TLS 検証を無効化せず、Content-Type とスキーマを検証し、そのまま中継せず自前の型へ変換する（§19.15）。
+- 外部 API の応答も信頼できない入力として扱う。Content-Type とスキーマを検証し、そのまま中継せず自前の型へ変換する（§19.15）。
+- 外部通信の TLS 検証を無効化せず、証明書の信頼チェーン・期限・接続先ホスト名を検証する。機密性または完全性の保護が必要な通信では TLS を使い、検証失敗時の平文への fallback、HTTPS から HTTP へのリダイレクトで漏えい・改ざんが可能になる経路を確認する。ブラウザ向け HSTS があっても、サーバーの外部 HTTP クライアントの検証を代替しない（[OWASP Transport Layer Security](https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html)）。
 - 外部 HTTP（connect / read / 全体）・DB クエリ・子プロセス・ジョブに明示的な timeout を持たせる。受信ボディ・フォーム・multipart のパーツ数・外部レスポンスのサイズには、実際に読んだバイト数で上限を掛ける（Content-Length だけを信用しない）。検索の複雑さ・並列数・課金 API の呼び出し回数など、1 リクエストの重さにも上限を設ける（§15.18, §19.11, §24.12-24.14）。
 - 外部入力は構文（型・長さ・範囲）と意味（実在・状態）を分けてサーバー側で検証する（クライアント側の検証は UX であって境界ではない）。未指定・空文字・null を区別し、型変換の失敗を既定値で黙って隠さない。未知のフィールドと同名パラメータの複数指定の扱いを契約として決め、検証がすべて通るまで保存や外部送信をしない（§10.3-10.8, §10.16-10.18, 既存 TS-B / PHP-B）。
 
 誤検知の注意:
-- HTTP クライアント関数が危険なのではなく、信頼できない値が接続先に届くことが問題。宛先が固定の設定や論理 ID 由来なら指摘しない。ただしリダイレクト追従・本文の返却・ヘッダーの転送は別途確認する（§15.4）。
+- HTTP クライアント関数が危険なのではなく、信頼できない値が接続先に届くことが問題。宛先が固定の設定や論理 ID 由来なら SSRF としては指摘しない。ただし TLS 検証・リダイレクト追従・本文の返却・ヘッダーの転送は別途確認する（§15.4）。
+- 正しく信頼された private CA を使う構成を、証明書検証の無効化と混同しない。証明書・公開鍵 pinning の不在を一般の Web/API 通信の欠陥としない。ネイティブモバイルで明示された MASVS 要件を評価するときは適用対象を確認し、導入済みなら鍵更新・バックアップ pin・安全な配布経路も確認する。ブラウザの HPKP は推奨しない（[OWASP Pinning](https://cheatsheetseries.owasp.org/cheatsheets/Pinning_Cheat_Sheet.html)、[OWASP Transport Layer Security](https://cheatsheetseries.owasp.org/cheatsheets/Transport_Layer_Security_Cheat_Sheet.html)）。
 - timeout やサイズの制限は、内部宛先を許す理由にならない。逆に、クラウドのメタデータ遮断や egress 制限は追加の防御で、アプリ側の検証の代わりにならない（§15.18, §15.20）。
 - 入力検証は、SQLi のパラメータ化・XSS の出力処理・認可の代わりにならない。自由文の特殊文字（`<` `'` `&`）を禁止する検証は正当な入力を壊すので、それ自体が指摘対象（§10.9, §10.10）。
 
-Report only concrete paths where an untrusted value controls an outbound destination, or where a missing limit or validation is reachable from external input.
+Report only concrete paths where an untrusted value controls an outbound destination, a connection exposes data to disclosure or tampering, or a missing limit or validation is reachable from external input.
 
 ## Focus G: ファイル（アップロード・配信・パス）
 
@@ -148,11 +153,15 @@ Report only concrete file-handling gaps where an untrusted name, path, type, or 
 
 ## Focus H: 情報露出・ログ・本番設定
 
-エラー応答・デバッグ機能・秘密の配置・proxy と Host の信頼・セキュリティイベントの記録をレビューする。
+エラー応答・デバッグ機能・秘密と保存データの保護・暗号鍵の管理・プライバシー・proxy と Host の信頼・セキュリティイベントの記録をレビューする。
 
 - エラー応答に、例外メッセージ・クラス名・スタックトレース・SQL・ファイルパスを返さない。利用者には一般化したコードとリクエスト ID を返し、詳細はサーバーのログへ出す。予期しない例外もハンドラで一般化する。パース・テンプレート・外部通信のエラーも同様（§14.16, §16.20, §21.4-21.6, 既存 PHP-B）。
 - デバッグモード・組み込みデバッガ・診断用エンドポイント（プロファイラ等）を公開環境で有効にしない。本番設定は起動時に検査し、欠落や危険な値（DEBUG 有効、短い・既定のシークレット、Cookie の Secure 無効、許可 Host の未設定）なら warning で続行せず起動を失敗させる（§21.7, §24.15）。
 - 署名鍵・API キー・DB の認証情報などのシークレットを、ソース・クライアントバンドル（公開用の環境変数を含む）・HTML・ソースマップに入れない。ブラウザへ配るものはすべて公開される（公開キーはプロバイダ側で Origin や quota を制限する）。平文の秘匿値は値オブジェクト等で包み、文字列化やダンプの時点でマスクする（§21.9, §21.10, §24.7, 既存 TS-B / PHP-B）。
+- 機密データの保存先を DB だけでなくキャッシュ・一時ファイル・エクスポート・バックアップまで追い、不要な複製、読み取り権限、保持期間と削除経路を確認する。暗号化の要否と層は保護対象・想定する読み取り主体で判断し、ディスク暗号化だけでアプリ経由の漏えいも防げると扱わない（[OWASP Cryptographic Storage](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)、[OWASP User Privacy Protection](https://cheatsheetseries.owasp.org/cheatsheets/User_Privacy_Protection_Cheat_Sheet.html)）。
+- 保存データを暗号化する処理は、保守されたライブラリの認証付き暗号を優先し、改ざん検証の失敗を拒否する。対応する認証付き暗号が使えない場合は、検証された Encrypt-then-MAC 構成かを確認する。独自暗号・ECB・暗号化だけで完全性も保証する扱いを避け、nonce/IV は選択した方式の要件を満たすか確認する（GCM では同じ鍵で nonce を再利用しない）。パスワードの保存は Focus C の専用ハッシュで扱う（[OWASP Cryptographic Storage](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)）。
+- 暗号鍵の生成には CSPRNG・専用の鍵管理サービスを使い、導出鍵なら用途に合う標準 KDF とそのパラメータを確認する。鍵は暗号文と分離してアクセス権を絞る。差分が鍵管理を変えるなら、用途の分離、旧新鍵を併存させる場合の識別、更新後に既存データを復号する経路、漏えい時の失効・再暗号化、必要な鍵の復旧と不要になった鍵の破棄を確認する。鍵と暗号文を同じ取得権限で読める状態を、保存先が違うだけで分離済みとしない（[OWASP Key Management](https://cheatsheetseries.owasp.org/cheatsheets/Key_Management_Cheat_Sheet.html)、[OWASP Cryptographic Storage](https://cheatsheetseries.owasp.org/cheatsheets/Cryptographic_Storage_Cheat_Sheet.html)）。
+- 個人データを新たに収集・送信する差分では、目的に必要な項目だけか、解析 SDK・広告 SDK・telemetry に識別子や機微情報が渡るかを追う。説明された収集目的・利用者の選択と実際の送信を照合し、同意が必要な機能では初期化時の先行送信や撤回後の送信継続がないか確認する。保持・削除は確認できた要件とデータ経路に基づき判断する（[OWASP User Privacy Protection](https://cheatsheetseries.owasp.org/cheatsheets/User_Privacy_Protection_Cheat_Sheet.html)、[OWASP MASVS-PRIVACY](https://mas.owasp.org/MASVS/12-MASVS-PRIVACY/)）。
 - `X-Forwarded-*` / Forwarded は、信頼済み proxy の背後でアプリへの直接経路を閉じたときだけ、信頼する段数か CIDR を指定して使う（無条件に信頼しない）。受信した Host からリセット URL・絶対 URL・リダイレクト先を生成せず、許可 Host か設定値を使う（§24.5, §24.6）。
 - 認証の成功・失敗・試行制限、認可の拒否（拒否するすべての経路で同じ方針）、成功した高リスク操作（権限変更・無効化・公開範囲の変更・削除）を、いつ・誰が・何を・結果・理由コード・リクエスト ID が揃った構造で記録する。Web 以外の入口（CLI・ワーカー）も含める（§25.4-25.9）。
 - リクエスト・レスポンスの本文やヘッダーを丸ごと記録しない。パスワード・セッション Cookie・Authorization・CSRF トークン・リセットトークン・MFA コードを、ログ・APM・エラー収集へ出さない。相関のために識別子を残すなら、HMAC などで元の値を復元できない形にする（§25.12, §25.13, 既存 PHP-B）。
@@ -164,5 +173,6 @@ Report only concrete file-handling gaps where an untrusted name, path, type, or 
 - ソースマップや Server ヘッダーの公開は、それ自体では重大ではない。含まれる内容（秘密・内部エンドポイント）で評価し、内部情報らしい名前だけで削除を求めない（§21.10, §21.11）。
 - 構造化ログやシリアライザーは形式の安全化であって、秘密の除外ではない。環境ごとに期待値が違う設定（ローカルの Secure 無効等）を一律に指摘しない（§24.15, §25.11）。
 - ログの一般的な品質（コンテキストの付与・ログレベル）は observability 観点の担当。ここではセキュリティに関わる露出と記録だけを見る。
+- 暗号 API の使用やアプリ層暗号化の不在だけで判断せず、データの機密性・脅威モデル・既存の保護を確かめる。保持期間や法的な同意要件を推測で新設せず、不明なら「確認できなかった範囲」に置く。ハッシュ化した識別子も、照合や再識別ができれば匿名化済みと扱わない。
 
 Report only concrete exposure, misconfiguration, or missing security-event paths visible in the diff; state what leaks to whom, or which event is missing.

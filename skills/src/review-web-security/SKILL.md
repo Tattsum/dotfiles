@@ -9,6 +9,7 @@ allowed-tools: [Bash, Read, Grep, Glob, Agent]
 Web アプリの `<base>...HEAD` 差分を、言語に依存しないセキュリティ観点の focus ごとに専任サブエージェントへ分担させてレビューし、統合した指摘リストを出す。レビューのみ行い、ファイルは編集しない。
 
 - 観点の正本は `references/focus-blocks.md`（コード用 A〜H）と `references/focus-blocks-supply-chain.md`（配備・サプライチェーン I）。言語別の危険 API は `references/sinks-go.md` / `sinks-php.md` / `sinks-ts.md`、出力の規律と重要度の軸は `references/output-discipline.md`。
+- OWASP MASVS 索引から Web にも適用できる観点を既存 focus に組み込んでいる。MASVS を指定されたレビューや分類・適用範囲を確認するときは [references/owasp-masvs.md](references/owasp-masvs.md) を読む。モバイルアプリの全要件を検証するスキルではなく、このレビューだけで MASVS 適合とは判定しない。
 - Claude Code 組み込みの `/security-review` は、確度の高い脆弱性を単発で洗い出す汎用スキャン。本スキルは言語別 Sink 表・書籍準拠の誤検知の注意・Must / Should / Nice を持ち、言語別オーケストレーターからも読み込まれる常設のレビュー観点という位置づけ。
 - Agent（サブエージェント）が使えない環境では、このスキルはユーザーセッションから直接起動する必要がある（インラインの単発レビューでは代替しない）。
 
