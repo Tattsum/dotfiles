@@ -37,6 +37,7 @@ skills/
     │   └── references/
     │       ├── focus-blocks.md                 # コード用 8 focus（インジェクション〜情報露出・ログ・本番設定）
     │       ├── focus-blocks-supply-chain.md    # 配備・サプライチェーン（Dockerfile / CI / lock があるときだけ起動）
+    │       ├── owasp-masvs.md                 # OWASP MASVS 索引との対応・出典・モバイルへの適用境界
     │       ├── must-verification.md            # security の Must 候補を 1 体で反証する契約
     │       ├── output-discipline.md            # Source→Sink・確認できなかった範囲・到達性・2 軸の重要度の出力規律
     │       └── sinks-go.md / sinks-php.md / sinks-ts.md  # 言語別 Sink 表

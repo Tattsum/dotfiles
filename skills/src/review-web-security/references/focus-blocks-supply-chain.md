@@ -11,6 +11,7 @@ Dockerfile・compose・`.github/workflows/*`・依存の manifest と lock・レ
 - manifest を変えた差分には、同じ差分に lock の更新が入っているか。lock の差分で、新しく増えた間接依存や意図しない更新を確認する。本番のビルド（Dockerfile / CI）は、レビュー済みの lock だけを消費するコマンドで install する（§23.4, §23.12, §23.17）。
 - install 時に走るスクリプトを必要なものに絞る。private パッケージの取得元は組織が管理する単一のレジストリに固定し、公開レジストリと同じ解決経路に混ぜない（dependency confusion）。レジストリの資格情報を URL や設定ファイルに直書きしない（§23.7, §23.9）。
 - 追加する依存は、正式名・配布元・ソースリポジトリとの対応・メンテナ・ライセンスを確認し、一行で済む処理のために大きな依存を入れない。脆弱性スキャンの除外設定には、advisory ID・理由・期限が付いているか（§23.8, §23.11, §23.13）。
+- 既知の脆弱性は、manifest の範囲指定でなく lock・成果物に解決された version と直接/間接依存の経路を、一次 advisory の影響範囲・修正版と照合する。プロジェクトで利用できる SCA 結果も使い、脆弱な機能・設定・入力経路と実行環境を確認する。修正版がなければ機能停止・代替・緩和策を検討する。警告の抑止は該当 advisory 単位で判断し、依存全体の除外で別の脆弱性まで隠さない。スキャナ未導入や advisory 未取得は「確認できなかった範囲」に記録し、安全と判定しない（[OWASP Vulnerable Dependency Management](https://cheatsheetseries.owasp.org/cheatsheets/Vulnerable_Dependency_Management_Cheat_Sheet.html)）。残存リスクの例外には、当スキルの運用規約として担当者・理由・期限・再評価条件を求める。
 - CI の第三者 action とビルドイメージは、commit SHA / digest で固定する（`@v4` のような可変タグを指摘する）。`permissions:` を job ごとに最小化し、fork 由来のコードを動かす trigger に secret を渡さない。依存導入やテストの job に本番の資格情報や公開用トークンを渡さず、publish は OIDC の短期資格情報で後段の job に限定する（§23.14）。
 - base image は digest で固定し、マルチステージビルドで、実行用イメージにコンパイラ・テストツール・dev 依存・テストコード・ソースマップ・`.env`・`.git`・バックアップを入れない（`.dockerignore` は明示的な COPY には効かない）。シークレットを `ENV` / `ARG` / `COPY` でイメージに焼き込まない（§21.12, §23.15, §24.7, §24.17）。
 - 非 root の USER で動かし、capability を落として `no-new-privileges` と read-only の root filesystem にし、書き込み先を限定する。Docker socket・ホストの home や `/`・リポジトリを mount しない。privileged / host network を使わない（§24.8-24.10）。
@@ -19,6 +20,7 @@ Dockerfile・compose・`.github/workflows/*`・依存の manifest と lock・レ
 
 誤検知の注意:
 - CVE が出ていることは、直ちに影響があることを意味しない。実際に入る version・導入元・脆弱な機能を使っているか・外部入力が届くかで評価する。一方で「自分のコードで import していない」は、間接依存を対象外にする理由にならない（§23.2, §23.11）。
+- CVSS の数値や「修正版なし」だけでレビューの重要度を決めない。dev 依存でも CI で信頼できない入力を処理したり、資格情報や成果物へ触れたりする経路を確認する。到達経路が確認できないことと、非到達を証明できたことを区別する。
 - lock のハッシュ一致・SCA の合格・SBOM の存在は、それぞれ別のことしか保証しない。どれか一つで安全と結論づけない（§23.6, §23.10, §23.20）。
 - ローカル専用・開発用の構成（compose の開発用サービス等）を本番の欠陥として指摘しない。proxy が無い構成に proxy 信頼設定を足すのはむしろ誤り。`0.0.0.0` への bind は port mapping と合わせて判断する（§24.1, §24.2, §24.5）。
 
