@@ -129,6 +129,33 @@ launchctl bootout gui/$(id -u)/<label>                       # 停止
   - `~/.agents/skills/`（Codex）
 - このリポジトリ自身では、ルートの `AGENTS.md` が同じ運用ルールを Codex に適用します。
 
+### Codex CLI のステータス行
+
+`~/.codex/config.toml` の `[tui]` に次の `status_line` を設定します。
+既存の `[tui]` がある場合は、そのテーブルに追加してください。
+`./install.sh` による自動適用は行いません。
+
+```toml
+[tui]
+status_line = [
+  "model-with-reasoning",
+  "context-window-size",
+  "context-used",
+  "estimated-thread-cost",
+  "used-tokens",
+  "five-hour-limit",
+  "weekly-limit",
+]
+```
+
+Claude Code の表示に合わせ、モデル名・思考レベル・コンテキスト容量・使用率を先頭に置き、
+トークン数と5時間／週の利用枠も表示します。推定費用は Codex CLI 0.163.0 では
+Enterprise ワークスペース向けで、取得できない場合は表示されません。
+
+設定ファイルを編集した後は Codex CLI を起動し直します。起動中に表示項目や順序を変える場合は
+`/statusline` を使います。選択結果は同じ `tui.status_line` に保存されます。
+詳細は [公式ドキュメント](https://learn.chatgpt.com/docs/developer-commands?surface=cli#configure-footer-items-with-statusline) を参照してください。
+
 ### Codex の Atlassian MCP
 
 `./install.sh` は Codex のユーザー設定に Atlassian MCP
