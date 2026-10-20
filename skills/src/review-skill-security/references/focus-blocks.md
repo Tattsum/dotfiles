@@ -120,9 +120,7 @@ Code that decodes and executes obfuscated payloads.
 - Encrypted payloads decrypted at runtime
 
 ### SC4 — Known Vulnerable Dependencies
-Dependencies with published CVEs (check against OSV.dev known-bad list).
-- `cryptography < 41.0`, `paramiko < 3.4`, `pillow < 10.2`, `aiohttp < 3.9.4`
-- `werkzeug < 3.0.3`, `flask < 3.0.3`, `django < 4.2.13`
+Dependencies with published CVEs. Check each pinned version against OSV.dev or the package's own advisories; if no advisory source can be reached, report it as unverified instead of judging from memory.
 
 ### SC5 — Abandoned Dependencies
 Known abandoned or deprecated packages.
