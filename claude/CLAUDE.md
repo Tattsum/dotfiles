@@ -139,4 +139,4 @@ PR レビューは同スキルがエントリポイント: PR 概要のリンク
 
 ## AI エージェント Skill セキュリティ（必須）
 
-外部ソース（GitHub・URL・ZIP・マーケットプレイス）から Skill をインストールする前に、**必ず `/review-skill-security` を実行する**（公開 Skill の 26% に脆弱性、5% に明確な悪意 — NVIDIA SkillSpector 調査）。16 カテゴリ / 64 パターンの静的解析基準・リスクスコア表は `review-skill-security` skill が正本。
+外部ソース（GitHub・URL・ZIP・マーケットプレイス）から Skill をインストールする前に、**必ず `/review-skill-security` を実行する**（公開 Skill の 26% に脆弱性、5% に明確な悪意 — NVIDIA SkillSpector 調査）。静的解析の基準とリスクスコア表は `review-skill-security` skill が正本。

@@ -1,6 +1,6 @@
 ---
 name: review-skill-security
-description: AI エージェント Skill（SKILL.md・スクリプト等）をインストール前にセキュリティレビューするとき。プロンプトインジェクション・データ窃取・権限昇格・サプライチェーン攻撃・過剰エージェンシー・MCP 汚染など 16 カテゴリ 64 パターンを静的解析し、リスクスコアとともに Must/Should/Info で報告する。外部リポジトリ・URL・ZIP・ローカルディレクトリのいずれにも対応。コードは修正しない。
+description: AI エージェント Skill（SKILL.md・スクリプト等）をインストール前にセキュリティレビューするとき。プロンプトインジェクション・データ窃取・権限昇格・サプライチェーン攻撃・過剰エージェンシー・MCP 汚染など 4 つの focus で定義したパターンを静的解析し、リスクスコアとともに Must/Should/Info で報告する。外部リポジトリ・URL・ZIP・ローカルディレクトリのいずれにも対応。コードは修正しない。
 allowed-tools: [Bash, Read, Grep, Glob, Agent]
 ---
 
