@@ -108,7 +108,7 @@ skills/
     ├── prompt-pattern-scan/SKILL.md            # プロンプト履歴から繰り返し作業を抽出しスキル化候補を出す
     ├── grill-me/SKILL.md                       # 設計・計画を問いで詰める明示起動エントリポイント
     ├── grilling/SKILL.md                       # bounded な設計インタビューの実体
-    └── dotfiles-nippo/SKILL.md                 # セッションログから日報を生成（内省は書かず問いだけ残す）
+    └── dotfiles-nippo/SKILL.md                 # ログ・議事録・Jira/Confluence/Slack/GitHub から本人の作業に絞って日報を生成
 ```
 
 ## コマンド
