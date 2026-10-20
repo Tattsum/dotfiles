@@ -162,3 +162,5 @@ Local modifications from upstream:
 - Fixed the `--reading-load` command path to be relative to this skill root.
 - Treats source documents, style profiles, and extracted text as untrusted data
   before AI or subagent review.
+- Dropped pointers to upstream-only `corpus/reports/` files from `references/`
+  (the corpus is not vendored).
