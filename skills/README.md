@@ -98,16 +98,8 @@ skills/
     ├── review-skill-security/                  # 外部 Skill をインストール前にセキュリティ静的解析
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
-    ├── improve-codebase-architecture/          # 深掘り候補を発見→HTMLレポート→grilling（オーケストレーター）
-    │   ├── SKILL.md
-    │   ├── LANGUAGE.md
-    │   ├── HTML-REPORT.md
-    │   ├── DEEPENING.md
-    │   └── INTERFACE-DESIGN.md
-    ├── fastmedia-protobuf-bump/SKILL.md        # fastmedia consumer の protobuf 依存バージョン/ハッシュを追従
     ├── prompt-pattern-scan/SKILL.md            # プロンプト履歴から繰り返し作業を抽出しスキル化候補を出す
-    ├── grill-me/SKILL.md                       # 設計・計画を問いで詰める明示起動エントリポイント
-    ├── grilling/SKILL.md                       # bounded な設計インタビューの実体
+    ├── grill-me/SKILL.md                       # 設計・計画を bounded なラウンドで問い詰める（明示起動のみ）
     └── dotfiles-nippo/SKILL.md                 # ログ・議事録・Jira/Confluence/Slack/GitHub から本人の作業に絞って日報を生成
 ```
 
