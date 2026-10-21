@@ -39,6 +39,8 @@ gh repo view --json defaultBranchRef -q .defaultBranchRef.name
 
 - 既定: `gh repo view --json defaultBranchRef -q .defaultBranchRef.name` で取得したデフォルトブランチ
 - 引数で base が明示された場合はそれを優先（リリースブランチ・stacked PR 等）
+- stacked PR（base を別の PR のブランチにしたもの）は、依存が本質的でなければ独立した PR に分けるよう提案する（利用者が明示した base は変えない）。重ねるなら、下位をマージし、上位の base が main に張り替わったのを確かめてから上位をマージする。張り替わる前に上位をマージすると、上位の内容は下位のブランチに入るだけで main に届かないのに、GitHub は両方を MERGED と表示する
+- マージの後は、fetch してから各 PR の main への到達を確かめる（`gh pr view <n> --json mergeCommit -q .mergeCommit.oid` で取ったコミットに `git merge-base --is-ancestor <oid> origin/main`）。`mergeCommit` が空なら未マージ。祖先でなくても、squash マージで祖先関係が切れているだけのことがあるので、`git diff origin/main <上位のブランチ>` に上位の変更が残っているかを見る。残っていれば、上位のブランチから main 向けの PR を作り直す
 
 ## タイトル
 
@@ -67,8 +69,11 @@ gh repo view --json defaultBranchRef -q .defaultBranchRef.name
 - [ ] <人が記入する未チェックのチェックリスト>
 ```
 
-- 本文は `git log <base>..HEAD` の Reason / Specification を集約して質を安定させる
+- 本文は `git log <base>..HEAD` の Reason / Specification を集約して質を安定させる。テンプレートに理由の欄が無くても、テンプレートの構成は崩さずに、概要の欄などへ Reason（なぜ）を 1〜2 文で必ず書く
 - 「動作確認」欄は未チェックの雛形として出力し、中身の記入・テスト結果の反映は人が行う
+- 本文にコマンドと出力を貼るときは、貼る形のコマンドを直前にそのまま実行して出力を写す（記憶から組み立てない）。CI と同じと書くなら CI の `run:` を読んで引数まで揃え、揃えられないなら書かない。出力を絞ったら絞ったと書き、実行していないものは「未確認」と書く
+- 検証ケースの入力（パス・ID）は実物から選ぶ（パスは `git ls-files`、それ以外は出どころを示す）。glob などの照合は存在しない入力でも成功するので、照合スクリプトには入力が実在するかを確かめて無ければ失敗させる処理を入れる。架空の値が要るなら架空と明記する
+- 書式（コミットのリンク、太字の閉じ方）は `dotfiles-review-and-act` の「返信と本文の書式」に従う
 
 ## draft / ready
 
