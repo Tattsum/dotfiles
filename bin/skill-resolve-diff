@@ -3,7 +3,7 @@
 # review skill 群がレビュー範囲を決めるための共通スクリプト。
 # base ブランチの解決・変更ファイル一覧・差分本文・言語判定を1回で返す。
 #
-# 同じコマンド列が 22 の SKILL.md に散っており、origin/main へのフォールバックは
+# かつて同じコマンド列が 22 の SKILL.md に散っており、origin/main へのフォールバックは
 # php 系 6 件と3オーケストレーターにしか書かれていなかった（go 6 件・ts 6 件は欠落）。
 # 散文で同じ手順を22回書くと必ずこの種のドリフトが起きるため、決定的な部分だけを
 # ここに集約する。重大度判定・仕様適合・意味的な重複排除は判断を伴うので持ち込まない。
@@ -84,7 +84,7 @@ else
   diff_all="$(git diff "$base...HEAD" -- "${pathspec[@]}")"
 fi
 
-# 切り詰めは残す（15並列サブエージェント全員に巨大差分を配るとコストが線形に伸びる）。
+# 切り詰めは残す（並列で起動する focus サブエージェント全員に巨大差分を配るとコストが線形に伸びる）。
 # ただし「どこで切れたか」を出力し、落ちたファイルは呼び出し側が Read で補完できるようにする。
 # 切断位置は commit が増えるたびに動くため、黙って落とすと実行ごとにレビュー結果が変わる。
 truncated=false
@@ -111,7 +111,7 @@ if [ "${#diff_all}" -gt "$max_chars" ]; then
     <(printf '%s\n' "$kept"  | rg -v '^$' | sort -u))"
 fi
 
-# 拡張子から言語を判定する。結果は言語別オーケストレーターの選択にのみ使う。
+# 拡張子から言語を判定する。結果は review-web-security が Sink 表を選ぶのに使う。
 languages=""
 if printf '%s\n' "$files" | rg -q '\.(go|sql|proto)$'; then languages="$languages"$'\n'"go"; fi
 if printf '%s\n' "$files" | rg -q '\.php$'; then languages="$languages"$'\n'"php"; fi

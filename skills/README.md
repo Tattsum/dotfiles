@@ -25,14 +25,16 @@ skills/
     ├── dotfiles-conflict-resolve/SKILL.md      # git コンフリクトを安全に解消（操作種別判定→退避線→解消→検証、add まで）
     ├── dotfiles-php-laravel-lint-test/SKILL.md # PHP/Laravel の lint / 静的解析 / test を実行
     ├── dotfiles-security-performance/SKILL.md  # 設計・実装時の軽量チェック（セキュリティは3つの問い＋原則、詳細は review-web-security）+ パフォーマンス
-    ├── dotfiles-review-and-act/                # PR レビュー → 所有者で分岐（自分=改修 / 他人=インライン投稿）
+    ├── dotfiles-review-and-act/SKILL.md        # PR レビュー → 所有者で分岐（自分=改修 / 他人=インライン投稿）。レビュー本体は dotfiles-code-review
+    ├── dotfiles-code-review/                   # 差分レビュー（Go / TS / PHP / IaC / 配備・サプライチェーンを差分から判定し、1 focus=1 サブエージェントで並列）
     │   ├── SKILL.md
     │   └── references/
-    │       └── cross-review.md                 # 別エージェント（Codex ⇄ Claude Code）の公式レビューをセカンドオピニオンとして取り込む手順（4オーケストレーター共通）
-    ├── dotfiles-go-review/SKILL.md             # Go レビューのオーケストレーター（7観点=23サブエージェントを並列起動）
-    ├── dotfiles-php-laravel-review/SKILL.md    # PHP/Laravel レビューのオーケストレーター（6観点=20サブエージェントを並列起動）
-    ├── dotfiles-ts-review/SKILL.md             # TS/Vue/React レビューのオーケストレーター（6観点=20サブエージェントを並列起動）
-    ├── review-web-security/                    # Web セキュリティ（言語横断・書籍準拠）。3オーケストレーターの security 観点の正本
+    │       ├── rubrics/go/*.md                 # Go: architecture / idioms / storage / test / observability / grpc
+    │       ├── rubrics/ts/*.md                 # TS: architecture / idioms / state / performance / test
+    │       ├── rubrics/php/*.md                # PHP: architecture / idioms / storage / test / observability
+    │       ├── rubrics/iac/iac.md              # IaC: module 境界・ライフサイクル / 命名規約 / セキュリティ・運用シグナル
+    │       └── cross-review.md                 # 別エージェント（Codex ⇄ Claude Code）の公式レビューをセカンドオピニオンとして取り込む手順
+    ├── review-web-security/                    # Web セキュリティ（言語横断・書籍準拠）。単体の入口と、dotfiles-code-review の security 観点の正本
     │   ├── SKILL.md
     │   └── references/
     │       ├── focus-blocks.md                 # コード用 8 focus（インジェクション〜情報露出・ログ・本番設定）
@@ -41,60 +43,9 @@ skills/
     │       ├── must-verification.md            # security の Must 候補を 1 体で反証する契約
     │       ├── output-discipline.md            # Source→Sink・確認できなかった範囲・到達性・2 軸の重要度の出力規律
     │       └── sinks-go.md / sinks-php.md / sinks-ts.md  # 言語別 Sink 表
-    ├── review-go-architecture/                 # Go: アーキテクチャ / レイヤー責務（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-go-idioms/                       # Go: イディオム / 型安全 / 命名（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-go-storage/                      # Go: DB / クエリ性能 / 外部I/O（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-go-test/                         # Go: テスト戦略 / テスト品質（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-go-observability/                # Go: ログ / 観測性 / 調査可能性（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-go-grpc/                         # Go: gRPC / Protobuf スキーマ・後方互換（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-php-architecture/                # PHP: レイヤー責務 / 設計（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-php-idioms/                      # PHP: イディオム / 型安全 / 命名（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-php-storage/                     # PHP: DB / クエリ性能（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-php-test/                        # PHP: テスト命名・構造 / 品質（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-php-observability/               # PHP: ログ / 観測性 / 調査可能性（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-ts-architecture/                 # TS: コンポーネント責務 / Container-Presentational（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-ts-idioms/                       # TS: 型安全 / 型定義 / styling・a11y / コード衛生（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-ts-state/                        # TS: 状態管理スコープ / effects・非同期（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-ts-performance/                  # TS: 再レンダリング / ロード・計算コスト（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-ts-test/                         # TS: テスト戦略 / テスト品質（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
-    ├── review-reachability/                    # 差分が触れる入口・リソースの到達性（IaC＋任意でライブ）を返す。security 観点と review-and-act が利用
+    ├── review-reachability/                    # 差分が触れる入口・リソースの到達性（IaC＋任意でライブ）を返す。dotfiles-code-review と review-web-security が利用
     │   ├── SKILL.md
     │   └── references/iac-signals.md
-    ├── review-iac/                             # IaC: Terraform/jsonnet の module 境界・ライフサイクル / 命名規約（単体観点）
-    │   ├── SKILL.md
-    │   └── references/focus-blocks.md
     ├── review-skill-security/                  # 外部 Skill をインストール前にセキュリティ静的解析
     │   ├── SKILL.md
     │   └── references/focus-blocks.md

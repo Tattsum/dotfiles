@@ -1,6 +1,6 @@
 ---
 name: dotfiles-security-performance
-description: 設計・実装の段階でセキュリティとパフォーマンスを重点的にチェックするとき。セキュリティは書籍『Webアプリケーションセキュリティ入門』準拠の3つの問い（データ・主体と権限・状態）と原則、パフォーマンスは N+1・メモリ/IO 効率を Must / Should / Nice to have で指摘する。差分のセキュリティレビューは review-web-security、言語別の詳細な観点は review-go-* / review-php-* / review-ts-* を使う（このスキルの対象外）。
+description: 設計・実装の段階でセキュリティとパフォーマンスを重点的にチェックするとき。セキュリティは書籍『Webアプリケーションセキュリティ入門』準拠の3つの問い（データ・主体と権限・状態）と原則、パフォーマンスは N+1・メモリ/IO 効率を Must / Should / Nice to have で指摘する。差分のセキュリティレビューは review-web-security、言語別の詳細な観点は dotfiles-code-review を使う（このスキルの対象外）。
 ---
 
 ## 目的

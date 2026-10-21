@@ -7,7 +7,9 @@
 # 判断を伴うので持ち込まない（呼び出し側の references/cross-review.md が正本）。
 #
 # Usage:
-#   skill-cross-review --from claude|codex --base <ref> [--timeout <sec>]
+#   skill-cross-review --from claude|codex --base <ref> [--timeout <sec>] [--repo-dir <path>]
+#
+#   --repo-dir  レビューする作業ツリー。無ければカレントディレクトリ。
 #
 # Output: stdout に JSON 1 オブジェクト
 #   status    ok / skipped / failed
@@ -24,12 +26,20 @@ set -euo pipefail
 from=""
 base=""
 timeout_sec=900
+repo_dir=""
 
 while [ $# -gt 0 ]; do
   case "$1" in
     --from)    from="${2:-}"; shift 2 ;;
     --base)    base="${2:-}"; shift 2 ;;
     --timeout) timeout_sec="${2:-}"; shift 2 ;;
+    --repo-dir)
+      repo_dir="${2:-}"
+      if [ -z "$repo_dir" ]; then
+        echo "--repo-dir にはディレクトリを指定してください" >&2
+        exit 2
+      fi
+      shift 2 ;;
     *)         echo "不明な引数: $1" >&2; exit 2 ;;
   esac
 done
@@ -77,6 +87,14 @@ fi
 
 if ! command -v "$reviewer" >/dev/null 2>&1; then
   emit failed "$reviewer コマンドが見つかりません"
+  exit 0
+fi
+
+# 作業ツリーを呼び出し側の `cd <dir> &&` で選ばせないのは、Claude Code の sandbox の
+# `skill-cross-review *` 除外が単独コマンドにしか効かず、前置すると codex が入れ子の
+# Seatbelt で起動できないため。
+if [ -n "$repo_dir" ] && ! cd "$repo_dir" 2>/dev/null; then
+  emit failed "ディレクトリ $repo_dir に移動できません"
   exit 0
 fi
 

@@ -1,6 +1,6 @@
 # セキュリティ担当の出力規律
 
-`review-web-security` の focus（A〜I）を担当するサブエージェントが従う。単体実行でも、言語別オーケストレーター（`dotfiles-go-review` / `dotfiles-php-laravel-review` / `dotfiles-ts-review`）経由でも同じ規律を使う。`§` は yousukezan『Webアプリケーションセキュリティ入門』の節番号。
+`review-web-security` の focus（A〜I）を担当するサブエージェントが従う。単体実行でも、`dotfiles-code-review` 経由でも同じ規律を使う。`§` は yousukezan『Webアプリケーションセキュリティ入門』の節番号。
 
 ## 読み方（指摘を探す手順）
 

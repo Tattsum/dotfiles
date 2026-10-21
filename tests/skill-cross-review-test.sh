@@ -158,6 +158,29 @@ expect_json no-diff "$out" '.status == "skipped"'
 out="$(run "$FULL_PATH" "$CROSS_REVIEW" --from claude --base no-such-branch)"
 expect_json unknown-base "$out" '.status == "failed" and (.reason | contains("no-such-branch"))'
 
+# --- --repo-dir: cwd が対象の作業ツリーでなくても、指定した作業ツリーをレビューする ---
+outside_cwd() {
+  (cd "$TEST_ROOT" && env PATH="$FULL_PATH" CLAUDECODE=1 CLAUDE_CODE_SESSION_ID=parent \
+    CODEX_THREAD_ID=parent CODEX_HOME=keep "$@")
+}
+: >"$CALL_LOG"
+out="$(outside_cwd "$CROSS_REVIEW" --from claude --base main --repo-dir "$WORK_REPO")"
+expect_json repo-dir "$out" '.status == "ok" and .reviews[0].status == "ok"'
+rg -qF 'codex [review]' "$CALL_LOG" || fail "repo-dir: 指定した作業ツリーで codex review を起動していない"
+
+out="$(outside_cwd "$CROSS_REVIEW" --from claude --base main)"
+expect_json no-repo-dir "$out" '.status == "failed" and (.reason | contains("git リポジトリではありません"))'
+
+out="$(outside_cwd "$CROSS_REVIEW" --from claude --base main --repo-dir "$TEST_ROOT/no-such-dir")"
+expect_json missing-repo-dir "$out" '.status == "failed" and (.reason | contains("移動できません"))'
+
+code=0
+run "$FULL_PATH" "$CROSS_REVIEW" --from claude --base main --repo-dir >/dev/null 2>&1 || code=$?
+[ "$code" -eq 2 ] || fail "repo-dir の値なしは exit 2 のはずが $code"
+code=0
+run "$FULL_PATH" "$CROSS_REVIEW" --from claude --base main --repo-dir "" >/dev/null 2>&1 || code=$?
+[ "$code" -eq 2 ] || fail "repo-dir 空文字は exit 2 のはずが $code"
+
 if [ "$failures" -gt 0 ]; then
   echo "$failures 件失敗" >&2
   exit 1

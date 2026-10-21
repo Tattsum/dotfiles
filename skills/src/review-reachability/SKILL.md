@@ -1,6 +1,6 @@
 ---
 name: review-reachability
-description: 差分が触れるアプリの入口（ルート・ハンドラ）とインフラのリソース（LB・WAF・Security Group・CloudFront・API Gateway・Lambda Function URL・ECS サービス）について、インターネットから届くか・どんな統制が効いているか・既存の公開面か・公開範囲が拡大／縮小したかを、IaC（Terraform / ecspresso jsonnet）で判定し、設定されていれば AWS のメタデータ専用ロールでライブ裏取りして返すとき。到達性コンテキスト（表と JSON）を返し、公開範囲の変更だけ指摘にする。コードは修正しない。「到達性を調べて」「この入口は公開されている？」「公開範囲が変わるか見て」「WAF や認証で塞がれているか確認して」等で発動。セキュリティレビュー（review-web-security と言語別オーケストレーター）と dotfiles-review-and-act が、重要度の判定材料としてこのスキルを呼ぶ。
+description: 差分が触れるアプリの入口（ルート・ハンドラ）とインフラのリソース（LB・WAF・Security Group・CloudFront・API Gateway・Lambda Function URL・ECS サービス）について、インターネットから届くか・どんな統制が効いているか・既存の公開面か・公開範囲が拡大／縮小したかを、IaC（Terraform / ecspresso jsonnet）で判定し、設定されていれば AWS のメタデータ専用ロールでライブ裏取りして返すとき。到達性コンテキスト（表と JSON）を返し、公開範囲の変更だけ指摘にする。コードは修正しない。「到達性を調べて」「この入口は公開されている？」「公開範囲が変わるか見て」「WAF や認証で塞がれているか確認して」等で発動。セキュリティレビュー（review-web-security と dotfiles-code-review）が、重要度の判定材料としてこのスキルを呼ぶ。
 allowed-tools: [Bash, Read, Grep, Glob]
 ---
 
@@ -38,8 +38,8 @@ allowed-tools: [Bash, Read, Grep, Glob]
 
 対象外:
 - コードの修正
-- 脆弱性の探索と重要度の最終判定: `review-web-security` と言語別オーケストレーター（このスキルは到達性だけを返す）
-- IaC の構成・命名・IAM の妥当性: `review-iac`
+- 脆弱性の探索と重要度の最終判定: `review-web-security` と `dotfiles-code-review`（このスキルは到達性だけを返す）
+- IaC の構成・命名・IAM の妥当性: `dotfiles-code-review` の iac
 - ライブの書き込み・データ本体の読み取り・設定の変更
 
 ## Workflow
