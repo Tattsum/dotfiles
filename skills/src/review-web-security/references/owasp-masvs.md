@@ -2,7 +2,7 @@
 
 確認日: 2026-10-16。参照元の [OWASP Cheat Sheet Series: MASVS Index](https://cheatsheetseries.owasp.org/IndexMASVS.html) は **MASVS 2.1.0** に基づく。索引は要件本文ではなく、分類ごとの Cheat Sheet の案内として使う。
 
-この資料は OWASP の内容を既存の Web レビューに合わせて要約・対応付けしたもの。各分類と focus の対応は当スキルの整理であり、OWASP 公式の対応表や全要件の網羅を表さない。詳細なチェックは既存 focus に置き、言語別オーケストレーターからも同じ観点を使う。
+この資料は OWASP の内容を既存の Web レビューに合わせて要約・対応付けしたもの。各分類と focus の対応は当スキルの整理であり、OWASP 公式の対応表や全要件の網羅を表さない。詳細なチェックは既存 focus に置き、`dotfiles-code-review` からも同じ観点を使う。
 
 ## 分類から担当を選ぶ
 

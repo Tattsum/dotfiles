@@ -6,7 +6,7 @@
 
 ## Focus I: 配備とサプライチェーン
 
-Dockerfile・compose・`.github/workflows/*`・依存の manifest と lock・レジストリ設定（`.npmrc` 等）の差分をレビューする。Terraform / jsonnet は `review-iac`、新規依存を採用するかどうかの判断は `dotfiles-plan-first` の Phase 2 が担当する。
+Dockerfile・compose・`.github/workflows/*`・依存の manifest と lock・レジストリ設定（`.npmrc` 等）の差分をレビューする。Terraform / jsonnet は `dotfiles-code-review` の iac、新規依存を採用するかどうかの判断は `dotfiles-plan-first` の Phase 2 が担当する。
 
 - manifest を変えた差分には、同じ差分に lock の更新が入っているか。lock の差分で、新しく増えた間接依存や意図しない更新を確認する。本番のビルド（Dockerfile / CI）は、レビュー済みの lock だけを消費するコマンドで install する（§23.4, §23.12, §23.17）。
 - install 時に走るスクリプトを必要なものに絞る。private パッケージの取得元は組織が管理する単一のレジストリに固定し、公開レジストリと同じ解決経路に混ぜない（dependency confusion）。レジストリの資格情報を URL や設定ファイルに直書きしない（§23.7, §23.9）。

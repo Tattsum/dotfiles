@@ -1,6 +1,6 @@
 # Must 候補の反証
 
-統合で重複を除いたあとの security の Must 候補だけを、反証エージェント 1 体にまとめて渡し、Must のまま出してよいかを検証する。単体実行でも、言語別オーケストレーター（`dotfiles-go-review` / `dotfiles-php-laravel-review` / `dotfiles-ts-review`）経由でも同じ契約を使う。検出と検証を別の担当に分けるのは、検出側が自分の指摘を過大に見積もる偏りを避けるため（NIST SP 800-115 の考え方: <https://csrc.nist.gov/pubs/sp/800/115/final>）。
+統合で重複を除いたあとの security の Must 候補だけを、反証エージェント 1 体にまとめて渡し、Must のまま出してよいかを検証する。単体実行でも、`dotfiles-code-review` 経由でも同じ契約を使う。検出と検証を別の担当に分けるのは、検出側が自分の指摘を過大に見積もる偏りを避けるため（NIST SP 800-115 の考え方: <https://csrc.nist.gov/pubs/sp/800/115/final>）。
 
 ## 実行条件
 

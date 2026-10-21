@@ -106,12 +106,9 @@ Jira 課題 / Confluence ページの URL を渡された調査・確認・回�
 
 差分レビューは最低限、レイヤー境界 / エラー処理 / 命名・可読性 / テスト / セキュリティ / パフォーマンスの6観点で見る。言語別の詳細チェックリストは以下のスキルが正本（ここには重複させない）:
 
-- Go バックエンド: `dotfiles-go-review`（`review-go-architecture` / `-idioms` / `-storage` / `-test` / `-observability` / `-grpc`）
-- PHP / Laravel: `dotfiles-php-laravel-review`（`review-php-*`）
-- TypeScript / Vue / Nuxt / React / Next: `dotfiles-ts-review`（`review-ts-*`）
-- Web セキュリティ（言語横断・書籍準拠）: `review-web-security`（上記3オーケストレーターが security 観点として読み込む。Dockerfile / CI / lock の配備・サプライチェーンも担当）
-- IaC（Terraform / OpenTofu / jsonnet）: `review-iac`（オーケストレーターは無く単体で完結）
-- 到達性（IaC＋AWS の読み取り専用メタデータ）: `review-reachability`（上記3オーケストレーターと `review-web-security` が security の前段で呼び、重要度の Likelihood と公開範囲の変更の指摘に使う。AWS は `skill-aws-reach` 経由のみ）
+- 差分レビュー（Go / PHP・Laravel / TypeScript・Vue・Nuxt・React・Next / IaC の Terraform・OpenTofu・jsonnet / 配備・サプライチェーン）: `dotfiles-code-review`（言語は差分から判定。観点を絞るときは `--focus`）
+- Web セキュリティ（言語横断・書籍準拠）: `review-web-security`（単体の入口。`dotfiles-code-review` も security 観点としてこの rubric を読み込む）
+- 到達性（IaC＋AWS の読み取り専用メタデータ）: `review-reachability`（`dotfiles-code-review` と `review-web-security` が security の前段で呼び、重要度の Likelihood と公開範囲の変更の指摘に使う。AWS は `skill-aws-reach` 経由のみ）
 - lint / test: `dotfiles-lint-and-test` / `dotfiles-php-laravel-lint-test`
 - セキュリティ・パフォーマンス横断（設計・実装時）: `dotfiles-security-performance`
 

@@ -2,7 +2,7 @@
 
 Use one block per subagent. Keep each subagent constrained to its assigned block.
 
-各項目末尾の `§` は、yousukezan『Webアプリケーションセキュリティ入門』（<https://bogus.jp/webapp_security_review.pdf>）の節番号。`既存 TS-A` / `既存 PHP-B` 等は、このスキルへ統合して廃止した旧 review-ts-security / review-php-security の Focus A / B 由来。言語別の API 名は focus に書かず `sinks-<lang>.md` に置く。
+各項目末尾の `§` は、yousukezan『Webアプリケーションセキュリティ入門』（<https://bogus.jp/webapp_security_review.pdf>）の節番号。`既存 TS-A` / `既存 PHP-B` 等は、このスキルへ統合して廃止した旧 TS / PHP のセキュリティ観点スキルの Focus A / B 由来。言語別の API 名は focus に書かず `sinks-<lang>.md` に置く。
 
 OWASP 出典を付けた項目は MASVS 索引のリンク先から補強した観点。分類と適用範囲は [owasp-masvs.md](owasp-masvs.md) を参照。
 
