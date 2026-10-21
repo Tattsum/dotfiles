@@ -43,6 +43,6 @@ Review unused code, duplicate logs, unnecessary data fetches, and slice initiali
 - Do not repeat loop-invariant conversions or computations inside loops (e.g. `string(enumValue)` that yields the same result every iteration); hoist them to a constant or precompute outside the loop.
 - Define repeated string literals as constants, but avoid constants for one-off values that are clearer inline.
 - Keep variables in the narrowest practical scope.
-- Information-placement split (see CLAUDE.md 情報配置の四分割原則): code carries HOW via naming/structure, comments carry WHY-NOT. Flag comments that restate HOW/WHAT the code already shows through names; a comment should justify a rejected alternative, trade-off, or gotcha, not narrate the code.
+- Information-placement split (see 情報配置の四分割原則 in the global instructions): code carries HOW via naming/structure, comments carry WHY-NOT. Flag comments that restate HOW/WHAT the code already shows through names; a comment should justify a rejected alternative, trade-off, or gotcha, not narrate the code.
 
 Report only concrete waste, noise, or future maintenance risk.

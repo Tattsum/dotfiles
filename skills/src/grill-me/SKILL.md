@@ -1,10 +1,7 @@
 ---
 name: grill-me
-description: A user-invoked interview that sharpens a plan or design.
-disable-model-invocation: true
+description: 計画・設計を、決定事項の依存関係に沿ったラウンド制の質問（1ラウンド最大5問・各問に推奨を添える）で問い詰め、共通理解に達するまで掘り下げる。ユーザーが「grill して」「この計画を詰めて」などと明示的に求めたとき、または dotfiles-plan-first の合意形成フェーズ（Phase 4）から呼ぶ。それ以外の会話では自分から起動しない。
 ---
-
-This skill is an explicit entry point only. Do not invoke it implicitly.
 
 Interview the user until you reach a shared understanding. Map this as a
 **design tree**: every decision branches into the decisions that depend on it.
@@ -49,4 +46,5 @@ before starting another round.
 Adapted from `mattpocock/skills` at commit
 `6654f6b60cd9d5be8b54c6fafe44346dabeb3b76` (the `grill-me` entry point and the
 `grilling` skill it delegated to, merged into one) with bounded rounds,
-questions, and subagent usage.
+questions, and subagent usage. Model invocation is allowed so that
+`dotfiles-plan-first` can call it during its agreement phase.
