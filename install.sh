@@ -19,9 +19,19 @@ link_file() {
 }
 
 echo "------------------------------"
+echo "🤖 AI エージェントのグローバル指示をリンクします..."
+echo "------------------------------"
+# Claude Code だけの指示を CLAUDE.md 側で @import して共通部分に重ねる形にはしない。
+# import 先の symlink が欠けたときの挙動は公式に書かれておらず、共通ルールごと消えても気づけない恐れがある。
+# 共通部分は両ツールへ同じファイルを直接 symlink し、Claude 固有分だけ rules に逃がす。
+link_file "$DOTFILES_DIR/agents/AGENTS.md" "$HOME/.claude/CLAUDE.md"
+link_file "$DOTFILES_DIR/agents/AGENTS.md" "$HOME/.codex/AGENTS.md"
+link_file "$DOTFILES_DIR/claude/rules/claude-code.md" "$HOME/.claude/rules/claude-code.md"
+
+echo ""
+echo "------------------------------"
 echo "📝 Claude Code の設定をリンクします..."
 echo "------------------------------"
-link_file "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.claude/CLAUDE.md"
 link_file "$DOTFILES_DIR/claude/settings.json" "$HOME/.claude/settings.json"
 link_file "$DOTFILES_DIR/claude/statusline.sh" "$HOME/.claude/statusline.sh"
 link_file "$DOTFILES_DIR/claude/subagent-statusline.sh" "$HOME/.claude/subagent-statusline.sh"
@@ -32,14 +42,6 @@ echo "------------------------------"
 echo "🔐 Claude Code の SSL_CERT_FILE が指す CA バンドルを生成します..."
 echo "------------------------------"
 "$DOTFILES_DIR/bin/build-ca-bundle"
-
-echo ""
-echo "------------------------------"
-echo "🤖 Codex の運用ルールをリンクします..."
-echo "------------------------------"
-# Claude Code と Codex で運用ルールの正本を共有する。Codex は
-# ~/.codex/AGENTS.md をグローバル指示として読み込む。
-link_file "$DOTFILES_DIR/claude/CLAUDE.md" "$HOME/.codex/AGENTS.md"
 
 echo ""
 echo "------------------------------"

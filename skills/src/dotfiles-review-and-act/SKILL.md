@@ -117,7 +117,7 @@ skill-resolve-diff --base <base>
 
 言語の判定とは別に、`review-web-security --scope=supply-chain` を毎回起動する。Dockerfile・compose・CI workflow・依存の manifest / lock は言語別オーケストレーターの拡張子フィルタを通らないため、配備・サプライチェーンの focus はここから起動しないと PR レビューで一度も動かない。対象ファイルの判定は `review-web-security` 側だけに持たせ（パターンをここへ複製しない）、対象が無ければ同スキルが `focus I は未実行` と返して即終了する。その出力も `<FINDINGS>` に含める。
 
-いずれの言語にも当たらない場合は、CLAUDE.md「基本観点」（レイヤー境界 / エラー処理 / 命名・可読性 / テスト / セキュリティ / パフォーマンス）でインラインレビューする。委譲先の出力（Must / Should / Nice の重要度別指摘リスト）を `<FINDINGS>` として保持する。
+いずれの言語にも当たらない場合は、グローバル指示の「基本観点」（レイヤー境界 / エラー処理 / 命名・可読性 / テスト / セキュリティ / パフォーマンス）でインラインレビューする。委譲先の出力（Must / Should / Nice の重要度別指摘リスト）を `<FINDINGS>` として保持する。
 
 **セカンドオピニオン**: `--no-cross-review` が無ければ、`references/cross-review.md` を Read し、その「起動」に従って `skill-cross-review --from <claude|codex> --base <base>` を**言語別オーケストレーターより先に**起動する（Claude Code ならバックグラウンド実行。相手のレビューを待つ数分を、こちらのレビューと重ねるため）。このとき言語別オーケストレーターには**必ず `--no-cross-review` を渡す**。言語が混在する PR で相手エージェントを言語の数だけ呼ばず、PR 全体に対してここで 1 回だけ実行するため。結果は `cross-review.md` の「結果の扱い」で検証・分類し、検証済みの指摘は観点 `second opinion（<reviewer>）` として `<FINDINGS>` に加える。未検証の指摘は `<FINDINGS>` に入れず、会話への報告だけに使う。
 
@@ -153,7 +153,7 @@ skill-resolve-diff --base <base>
 
 ## コメント投稿手順（PJ ルール・投稿モードの正本）
 
-> GitHub レビューコメントの投稿規則の**正本はこのセクション**。CLAUDE.md 本体はここへの pointer のみを持つ。
+> GitHub レビューコメントの投稿規則の**正本はこのセクション**。グローバル指示はここへの pointer のみを持つ。
 
 ### バッジ（必須）
 

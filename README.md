@@ -120,14 +120,26 @@ launchctl bootout gui/$(id -u)/<label>                       # 停止
 
 ## Claude Code / Cursor / Codex の運用ルールと Skills
 
-- 常時適用する運用ルールの正本は `claude/CLAUDE.md` です。
+- 全エージェント共通のグローバル指示の正本は `agents/AGENTS.md` です。`./install.sh` により次へ symlink します。
   - Claude Code: `~/.claude/CLAUDE.md`
   - Codex: `~/.codex/AGENTS.md`
+- Claude Code だけの指示（sandbox 下での gh の扱いなど）は `claude/rules/` に置き、`~/.claude/rules/` へ symlink します。
+  Codex には届けません。共通ファイルには `@import`・HTML コメント・Claude Code 固有の設定名を書かないでください
+  （Codex がこれらを解釈する保証はありません）。
+- Cursor へはグローバル指示を自動配布しません。Cursor の User Rules は設定画面でしか登録できないためです。
+  必要なら `agents/AGENTS.md` を User Rules に手で貼ってください。
 - Skills の正本は `skills/src/` です。`./install.sh` により次へ同じ内容を symlink します。
   - `~/.claude/skills/`
   - `~/.cursor/skills/`
   - `~/.agents/skills/`（Codex）
-- このリポジトリ自身では、ルートの `AGENTS.md` が同じ運用ルールを Codex に適用します。
+- ルートの `AGENTS.md` は、このリポジトリで作業するときだけの指示です（Claude Code・Codex・Cursor が読みます）。
+  Claude Code は、作業ディレクトリかその上位に `CLAUDE.md`・`.claude/CLAUDE.md`・`CLAUDE.local.md` があると
+  `AGENTS.md` を読まなくなるので、このリポジトリにはそれらを置かないでください。
+- 指示ファイルを変えたら、新しいセッションで読み込みを確認します。Claude Code は `/context` の Memory files と
+  `/doctor prompt-audit`、Codex は起動直後のセッションで確認します。
+- `~/.claude/CLAUDE.md` の symlink を張り替える（`install.sh` でリンク先を変える場合を含む）ときは、
+  先に Claude Code のセッションをすべて終了してください。起動中のセッションがあると、張り替えたリンクが
+  数秒で消えます（2026-10 に実測。リンク先の名前や、張り替えを Claude Code の外で行ったかには関係なく起きた）。
 
 ### Codex CLI のステータス行
 
@@ -175,11 +187,7 @@ Claude Code の claude.ai コネクタ認証と Codex の MCP OAuth 認証は別
 
 ### Cursor / Codex Skills（リポジトリ配布）
 
-- **汎用 `.cursorrules`**
-  - `cursor/.cursorrules` を用意しています。
-  - 各リポジトリに入れたい場合は、そのリポジトリ直下へコピーして使ってください。
-- **汎用 Skills**
-  - `skills/` 配下に共通 Agent Skill の雛形を置いています。
-  - 任意のリポジトリへ展開する例:
-    - `make -C skills install TARGET=/path/to/repo`
-  - `.cursor/skills/` と `.agents/skills/`（Codex）の両方へコピーされます。
+- `skills/` 配下に共通 Agent Skill の雛形を置いています。
+- 任意のリポジトリへ展開する例:
+  - `make -C skills install TARGET=/path/to/repo`
+- `.cursor/skills/` と `.agents/skills/`（Codex）の両方へコピーされます。
