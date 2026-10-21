@@ -16,6 +16,7 @@ allowed-tools: [Bash, Read, Grep, Glob, Agent]
 - `--base=<branch>`: optional。解決は `skill-resolve-diff` に委譲する（`origin/master`、無ければ `origin/main`）。
 - `--focus=<観点>[,<観点>...]`: optional。起動する観点を絞る。観点名は下表の OWNER（`architecture` / `idioms` / `storage` / `test` / `observability` / `grpc` / `state` / `performance` / `security` / `iac` / `supply-chain`）。指定したときはセカンドオピニオンと横断チェックを実行しない（観点を絞った依頼に全体レビューの指摘が混ざるため）。到達性は `security` か `iac` を含むときだけ解決する。
 - `--no-cross-review`: optional。セカンドオピニオン（別エージェントの公式レビュー）を実行しない。
+- `--repo-dir=<path>`: optional。レビュー対象の作業ツリー（PR の head を展開した worktree など）。以下の `<REPO_ROOT>` はその絶対パス。無ければ手順1の前にカレントディレクトリで `git rev-parse --show-toplevel` を実行し、その結果とする（サブディレクトリで起動しても基準をリポジトリのルートにそろえるため）。対象が作業ディレクトリの外にあるときは必ず指定する: Bash の cwd がコマンドごとに作業ディレクトリへ戻り、`cd` だけでは別のリポジトリをレビューしてしまうため。
 
 ## ファミリーと rubric
 
@@ -42,47 +43,54 @@ allowed-tools: [Bash, Read, Grep, Glob, Agent]
 スキーマ:
 
 ```bash
-git diff --quiet <base>...HEAD -- ':(glob,icase)**/*.sql' ':(glob,icase)**/migration/**' ':(glob,icase)**/migrations/**'
+git -C <REPO_ROOT> diff --quiet <base>...HEAD -- ':(glob,icase)**/*.sql' ':(glob,icase)**/migration/**' ':(glob,icase)**/migrations/**'
 ```
 
 API スキーマ:
 
 ```bash
-git diff --quiet <base>...HEAD -- ':(glob,icase)**/*.proto' ':(glob,icase)**/*.pb.go' ':(glob,icase)**/*openapi*.yaml' ':(glob,icase)**/*openapi*.yml' ':(glob,icase)**/*openapi*.json' ':(glob,icase)**/*swagger*.yaml' ':(glob,icase)**/*swagger*.yml' ':(glob,icase)**/*swagger*.json' ':(glob,icase)**/openapi/**/*.yaml' ':(glob,icase)**/openapi/**/*.yml' ':(glob,icase)**/openapi/**/*.json' ':(glob,icase)**/swagger/**/*.yaml' ':(glob,icase)**/swagger/**/*.yml' ':(glob,icase)**/swagger/**/*.json'
+git -C <REPO_ROOT> diff --quiet <base>...HEAD -- ':(glob,icase)**/*.proto' ':(glob,icase)**/*.pb.go' ':(glob,icase)**/*openapi*.yaml' ':(glob,icase)**/*openapi*.yml' ':(glob,icase)**/*openapi*.json' ':(glob,icase)**/*swagger*.yaml' ':(glob,icase)**/*swagger*.yml' ':(glob,icase)**/*swagger*.json' ':(glob,icase)**/openapi/**/*.yaml' ':(glob,icase)**/openapi/**/*.yml' ':(glob,icase)**/openapi/**/*.json' ':(glob,icase)**/swagger/**/*.yaml' ':(glob,icase)**/swagger/**/*.yml' ':(glob,icase)**/swagger/**/*.json'
 ```
 
-終了コード 1（条件に当たる変更がある）なら起動し、0 なら起動せずその focus を `未実行（起動条件なし）` として扱う。起動するときは、同じ pathspec で `git diff --name-only <base>...HEAD -- <ゲートの pathspec>` を実行し、ファミリーの `<TARGET_FILES>` に無いファイル（OpenAPI の定義など）をその focus の担当の対象ファイルに足す（差分本文には入らないので、担当は Read で全文を読む）。それ以外（コマンドの失敗）なら起動する。`git diff --name-only | rg -q` のようなパイプにしない: 終了コードが rg のものになり、git の失敗が「条件なし」に化けて focus が黙って外れる。`go/grpc` の `## Focus B` はゲートしない: ステータスコードとエラー分類の指摘はハンドラやユースケースのコードに出て、仕様ファイルが変わらない差分でも起きるため。
+終了コード 1（条件に当たる変更がある）なら起動し、0 なら起動せずその focus を `未実行（起動条件なし）` として扱う。起動するときは、同じ pathspec で `git -C <REPO_ROOT> diff --name-only <base>...HEAD -- <ゲートの pathspec>` を実行し、ファミリーの `<TARGET_FILES>` に無いファイル（OpenAPI の定義など）をその focus の担当の対象ファイルに足す（差分本文には入らないので、担当は Read で全文を読む）。それ以外（コマンドの失敗）なら起動する。`git diff --name-only | rg -q` のようなパイプにしない: 終了コードが rg のものになり、git の失敗が「条件なし」に化けて focus が黙って外れる。`go/grpc` の `## Focus B` はゲートしない: ステータスコードとエラー分類の指摘はハンドラやユースケースのコードに出て、仕様ファイルが変わらない差分でも起きるため。
 
 ## Workflow
 
-1. ファミリーごとにレビュー範囲を解決する。5 ファミリーぶんをそれぞれ単独のコマンドで実行する（並列可）。`--base` が指定されていなければ `--base` を付けずに実行し、返った JSON の `base` を以降の `<base>` とする（起動ゲート・到達性・セカンドオピニオンのコマンドもこれを使う）:
+1. 差分ファイルの置き場を作る。`mktemp -d "${TMPDIR:-/tmp}/code-review.XXXXXX"` を実行し、返った絶対パスを `<DIFF_DIR>` とする。
+2. ファミリーごとにレビュー範囲を解決し、`<DIFF_DIR>` に書く。5 ファミリーぶんをそれぞれ別のコマンドで実行する（並列可）。`--base` が指定されていなければ `--base` を付けずに実行し、返った JSON の `base` を以降の `<base>` とする（起動ゲート・到達性・セカンドオピニオンのコマンドもこれを使う）:
 
 ```bash
-skill-resolve-diff [--base <base>] -- <ファミリーの pathspec>
+cd <REPO_ROOT> && skill-resolve-diff [--base <base>] -- <ファミリーの pathspec> > <DIFF_DIR>/<ファミリー>.json
 ```
 
-2. base ブランチが解決できなければ、`skill-resolve-diff` のエラーメッセージをそのまま伝えて終了。
-3. 全ファミリーの `files` が空なら `レビュー対象の変更がありません` と伝えて終了。`files` が空のファミリーは以降扱わず、統合の出力で `対象ファイルなし` として名前だけ挙げる。
-4. ファミリーごとに `files` を `<TARGET_FILES>`、`diff` を `<DIFF_CONTEXT>` として保持する。`truncated` が true のときは `truncated_files` を `<TRUNCATED_FILES>` として保持し、そのファミリーのサブエージェント全員に渡したうえで、切り詰めが起きた事実と落ちたファイル一覧をユーザーに報告する。黙って落とさない: 切断位置は commit が増えるたびに動くため、同じ PR でも実行ごとにレビュー範囲が変わる。
-   あわせて `git diff --name-only <base>...HEAD` を単独のコマンドで実行し、差分の全ファイルを `<ALL_FILES>` とする（セカンドオピニオンの対象外判定に使う）。
-5. 起動する OWNER を決める。対象ファミリーの OWNER すべて（go / ts / php は security を含む）から、`--focus` があればそれ以外を外す。続けて「起動ゲート」のコマンドを実行し、条件に当たらない focus を外す。起動する focus が 0 件なら `--focus <指定値> に該当する観点がこの差分にありません` と伝えて終了する（表に無い観点名はその旨も挙げる）。指摘なしの出力にしない: 「見ていない」を「問題なし」と読ませないため。
-6. 起動する OWNER の rubric を Read する。security か supply-chain を起動するなら `<SEC_DIR>/references/output-discipline.md` が、security を起動するファミリーがあればそのファミリーの Sink 表が、supply-chain を起動するなら `<SEC_DIR>/SKILL.md` が読めることを `test -r` で確認する（本文はサブエージェントが読む）。**どれか一つでも読めなければ停止する（fail closed）**。読めなかったパスを挙げ、`./install.sh` を実行して skill を再配置するよう伝えて終了する。一部だけで続行しない: 「その観点で指摘が0件だった」と「その観点をそもそも実行していない」が出力上区別できず、同じ PR を再レビューしたときに前回の指摘が理由なく消えるため。
-7. `--focus` も `--no-cross-review` も無ければ `<SKILL_DIR>/references/cross-review.md` を Read する。読めなくても停止せず、セカンドオピニオンを `未実施（cross-review.md が読めない）` として続行する。focus block の fail closed と扱いを分けるのは、相手エージェントの所見は補助であり、欠けても自分側の観点の網羅性は変わらないため。
-8. 次の 2 つを 1 つのアシスタントメッセージで起動する（focus サブエージェントより先。相手のレビューと到達性の解決を待つ数分を、こちらのレビューと重ねるため）。
-   - セカンドオピニオンを実行するなら、`cross-review.md` の「起動」に従い `skill-cross-review --from <claude|codex> --base <base>` を起動する。
-   - go / ts / php / iac のいずれかに `files` があり、かつ `--focus` が無いか `security` / `iac` を含むなら、`general-purpose` サブエージェントを 1 体起動し、`~/.claude/skills/review-reachability/SKILL.md` を Read してその手順に従わせ（`--base <base>` を渡す）、返った出力を `<REACHABILITY_CONTEXT>` とする。`SKILL.md` が読めない・サブエージェントが失敗した場合も停止せず、`未解決（<理由>）` として続行する（全指摘が「到達性: 未確定」になる）。補助なので fail closed にしない。条件に当たらず起動しないときは `<REACHABILITY_CONTEXT>` を `未実行（<理由: 配備・サプライチェーンだけの差分 / --focus に security・iac を含まない>）` とする。
-9. 読み込んだ rubric 内の `## Focus ...` ブロック（起動ゲートで外したものを除く）が 1 サブエージェント分の担当範囲。security の focus は到達性コンテキストを渡すので、到達性の解決を待ってから起動する。**実際に数え、その数だけ** `general-purpose` サブエージェントを**1つのアシスタントメッセージ内で一斉に並列起動**する。逐次実行やインラインレビューで代替しない。件数はここに書かず必ず数えること（ハードコードすると focus 追加時にドリフトする）。
-10. 全サブエージェントとセカンドオピニオンの完了を待つ。
-11. `--focus` が無ければ、統合の前に下記「横断チェック」を全ファミリーの差分に対して自分で 1 回実施し、所見を観点 `横断` として持つ。
+   続けて `jq -r .diff <DIFF_DIR>/<ファミリー>.json > <DIFF_DIR>/<ファミリー>.diff` で差分本文を別ファイルにし、自分は `jq` で `base`・`files`・`truncated`・`truncated_files` だけを読む。差分本文はサブエージェントに参照で渡すので、自分のコンテキストには入れない（横断チェックとファミリー外のレビューで必要な範囲だけ Read する）。
+3. base ブランチが解決できなければ、`skill-resolve-diff` のエラーメッセージをそのまま伝えて終了。
+4. `git -C <REPO_ROOT> diff --name-only <base>...HEAD` を実行し、差分の全ファイルを `<ALL_FILES>` とする。空なら `レビュー対象の変更がありません` と伝えて終了。`files` が空のファミリーは以降扱わず、統合の出力で `対象ファイルなし` として名前だけ挙げる。
+5. ファミリーごとに `files` を `<TARGET_FILES>`、`<DIFF_DIR>/<ファミリー>.diff` を `<DIFF_FILE>` とする。`truncated` が true のときは `truncated_files` を `<TRUNCATED_FILES>` として保持し、そのファミリーのサブエージェント全員に渡したうえで、切り詰めが起きた事実と落ちたファイル一覧をユーザーに報告する。黙って落とさない: 切断位置は commit が増えるたびに動くため、同じ PR でも実行ごとにレビュー範囲が変わる。
+6. 起動する OWNER を決める。対象ファミリーの OWNER すべて（go / ts / php は security を含む）から、`--focus` があればそれ以外を外す。続けて「起動ゲート」のコマンドを実行し、条件に当たらない focus を外す。`--focus` を指定して起動する focus が 0 件になったら `--focus <指定値> に該当する観点がこの差分にありません` と伝えて終了する（表に無い観点名はその旨も挙げる）。指摘なしの出力にしない: 「見ていない」を「問題なし」と読ませないため。
+   起動ゲートを評価したあとで、`<ALL_FILES>` のうち、どのファミリーの `files` にも、起動した focus に起動ゲートで足したファイルにも入らないものを `<OTHER_FILES>` とする（ゲートの評価前に決めると、OpenAPI の定義のようにゲートで go/grpc の担当へ足すファイルが「ファミリー外」でも重ねてレビューされるため）。
+7. 起動する OWNER の rubric が読めることを `test -r` で確かめ、`rg -n '^## Focus' <rubric>` で focus の見出しを列挙する（本文はサブエージェントが読む）。security か supply-chain を起動するなら `<SEC_DIR>/references/output-discipline.md` が、security を起動するファミリーがあればそのファミリーの Sink 表が、supply-chain を起動するなら `<SEC_DIR>/SKILL.md` が読めることも確かめる。**どれか一つでも読めなければ停止する（fail closed）**。読めなかったパスを挙げ、`./install.sh` を実行して skill を再配置するよう伝えて終了する。一部だけで続行しない: 「その観点で指摘が0件だった」と「その観点をそもそも実行していない」が出力上区別できず、同じ PR を再レビューしたときに前回の指摘が理由なく消えるため。
+8. `--focus` も `--no-cross-review` も無ければ `<SKILL_DIR>/references/cross-review.md` を Read する。読めなくても停止せず、セカンドオピニオンを `未実施（cross-review.md が読めない）` として続行する。focus block の fail closed と扱いを分けるのは、相手エージェントの所見は補助であり、欠けても自分側の観点の網羅性は変わらないため。
+9. 次の 2 つを 1 つのアシスタントメッセージで起動する（focus サブエージェントより先。相手のレビューと到達性の解決を待つ数分を、こちらのレビューと重ねるため）。
+   - セカンドオピニオンを実行するなら、`cross-review.md` の「起動」に従い `skill-cross-review --from <claude|codex> --base <base> --repo-dir <REPO_ROOT>` を起動する。
+   - go / ts / php / iac のいずれかに `files` があり、かつ `--focus` が無いか `security` / `iac` を含むなら、`general-purpose` サブエージェントを 1 体起動し、`~/.claude/skills/review-reachability/SKILL.md` を Read してその手順に従わせる（`--base <base>` と、対象の作業ツリーが `<REPO_ROOT>` であることを渡す）。返った出力を `<DIFF_DIR>/reachability.md` に書き、`<REACHABILITY_CONTEXT>` とする。`SKILL.md` が読めない・サブエージェントが失敗した場合も停止せず、`未解決（<理由>）` として続行する（全指摘が「到達性: 未確定」になる）。補助なので fail closed にしない。条件に当たらず起動しないときは `<REACHABILITY_CONTEXT>` を `未実行（<理由: 配備・サプライチェーンだけの差分 / --focus に security・iac を含まない>）` とする。
+10. 手順7で列挙した focus の見出し（起動ゲートで外したものを除く）1 つが 1 サブエージェント分の担当範囲。security の focus は到達性コンテキストを渡すので、到達性の解決を待ってから起動する。**実際に数え、その数だけ** `general-purpose` サブエージェントを**1つのアシスタントメッセージ内で一斉に並列起動**する。逐次実行やインラインレビューで代替しない。件数はここに書かず必ず数えること（ハードコードすると focus 追加時にドリフトする）。
+11. 全サブエージェントとセカンドオピニオンの完了を待つ。
+12. `--focus` が無ければ、統合の前に下記「横断チェック」と「ファミリー外のファイル」を自分で 1 回ずつ実施し、所見をそれぞれ観点 `横断`・`ファミリー外` として持つ。
 
 ## Subagent Prompt Shape
 
-go / ts / php / iac の各サブエージェントには、そのファミリーの共有コンテキストと 1 つの focus block を渡す。`<REVIEWER>` はファミリーの担当名、`<OWNER>` は観点名。go の storage 担当には差分に含まれる `.sql` ファイルも、go の grpc 担当には `.proto` ファイルも対象である旨を伝える。
+go / ts / php / iac の各サブエージェントには、そのファミリーの共有コンテキストと 1 つの focus を渡す。`<REVIEWER>` はファミリーの担当名、`<OWNER>` は観点名、`<RUBRIC_FILE>` はその OWNER の rubric の絶対パス、`<FOCUS_HEADING>` は手順7で列挙した見出し。go の storage 担当には差分に含まれる `.sql` ファイルも、go の grpc 担当には `.proto` ファイルも対象である旨を伝える。
 
-security 担当には、共有プロンプトの末尾に次の指示を足す: 「最初に `<SEC_DIR>/references/output-discipline.md` と `<そのファミリーの Sink 表>` を Read すること。出力は output-discipline.md の出力フォーマット（到達性・既存の公開面・CWE を含む）に従い、共有プロンプトの出力フォーマットと「該当なし」の書き方よりこちらを優先する。focus block の「誤検知の注意」に当たるものは報告しない。」あわせて同じ末尾に、`到達性コンテキスト:` の見出しに続けて `<REACHABILITY_CONTEXT>` を足し、次の 1 行を足す: 「これは差分の所有者側による防御目的のレビュー。攻撃手順・PoC は書かず、欠けている検証と修正の方向で書く（詳細は output-discipline.md）。」到達性コンテキストは security 担当にだけ渡す（到達性は security の重要度にだけ効き、他観点のプロンプトを太らせないため）。
+差分と focus block はプロンプトに埋め込まず、ファイルを参照させる。20 体ぶん埋め込むと 1 応答の出力上限を超え、本文を書き写すと rubric の原本とずれるため。
+
+security 担当には、共有プロンプトの末尾に次の指示を足す: 「最初に `<SEC_DIR>/references/output-discipline.md` と `<そのファミリーの Sink 表>` を Read すること。出力は output-discipline.md の出力フォーマット（到達性・既存の公開面・CWE を含む）に従い、共有プロンプトの出力フォーマットと「該当なし」の書き方よりこちらを優先する。focus block の「誤検知の注意」に当たるものは報告しない。」あわせて同じ末尾に、`到達性コンテキスト:` の見出しに続けて `<DIFF_DIR>/reachability.md を Read すること`（到達性を解決しなかったときは `<REACHABILITY_CONTEXT>` の 1 行）を足し、次の 1 行を足す: 「これは差分の所有者側による防御目的のレビュー。攻撃手順・PoC は書かず、欠けている検証と修正の方向で書く（詳細は output-discipline.md）。」到達性コンテキストは security 担当にだけ渡す（到達性は security の重要度にだけ効き、他観点のプロンプトを太らせないため）。
 
 ```text
 あなたは <REVIEWER>（観点: <OWNER>）の1名のレビュー担当です。レビューのみ行い、ファイルは編集しないでください。
+
+リポジトリのルート（Read は絶対パスで行い、git は `git -C <REPO_ROOT>` で実行する）:
+<REPO_ROOT>
 
 対象ファイル:
 <TARGET_FILES>
@@ -90,14 +98,14 @@ security 担当には、共有プロンプトの末尾に次の指示を足す: 
 ベースブランチ: <base>
 
 差分:
-<DIFF_CONTEXT>
+<DIFF_FILE> を Read すること。
 
 差分本文から切り詰めで落ちたファイル（空なら「なし」）:
 <TRUNCATED_FILES>
 ※ ここに挙がったファイルは差分本文に含まれていない。必ず Read で全文を読むこと。差分に無いことを見落としの理由にしない。ただし削除されたファイルは Read できないため、その場合のみ対象外として扱う。
 
 担当する focus:
-<FOCUS_BLOCK>
+<RUBRIC_FILE> を Read し、見出しが「<FOCUS_HEADING>」の節（その見出しから次の `## Focus` 見出しの直前まで）だけを担当範囲とする。
 
 手順:
 1. 差分を読み、変更されたファイルを Read ツールで全文読み取る。
@@ -116,7 +124,11 @@ security 担当には、共有プロンプトの末尾に次の指示を足す: 
 推測的・スタイルだけの指摘は避け、根拠を示せる具体的な指摘のみ報告してください。
 ```
 
-supply-chain の focus は、`<SEC_DIR>/SKILL.md` の「Subagent Prompt Shape」をそのまま使う。`<SKILL_DIR>` には `<SEC_DIR>`、`<SINK_FILES>` には「なし」、到達性コンテキストには `未解決（配備・サプライチェーンでは使わない）` を入れ、対象ファイル・差分は supply-chain ファミリーのものを渡す。
+supply-chain の focus は、`<SEC_DIR>/SKILL.md` の「Subagent Prompt Shape」を使う。`<SKILL_DIR>` には `<SEC_DIR>`、`<SINK_FILES>` には「なし」、到達性コンテキストには `未解決（配備・サプライチェーンでは使わない）` を入れ、対象ファイルは supply-chain ファミリーのものを渡す。リポジトリのルート・差分・focus block は、上の形と同じく参照で渡す。
+
+## ファミリー外のファイル（自分でレビュー）
+
+`<OTHER_FILES>`（どのファミリーの pathspec にも当たらない変更ファイル）は、自分で Read して、グローバル指示の基本観点（レイヤー境界 / エラー処理 / 命名・可読性 / テスト / セキュリティ / パフォーマンス）でレビューする。アクセス制御の規則（Firestore rules 等）・設定ファイル・スクリプトのように、言語の rubric が無くても挙動やセキュリティに効くファイルを、ほかのファミリーがある差分で取りこぼさないため。削除されたファイルは Read できないので、`git -C <REPO_ROOT> diff <base>...HEAD -- <path>` で消えた内容を読む。バイナリ（`git -C <REPO_ROOT> diff --numstat <base>...HEAD` で行数が `-` になるもの）は内容を見ず、名前だけ 📁 に挙げる。
 
 ## 横断チェック（自分で全ファミリーの差分に対して実施）
 
@@ -136,9 +148,9 @@ supply-chain の focus は、`<SEC_DIR>/SKILL.md` の「Subagent Prompt Shape」
 
 全サブエージェントが返ったら:
 
-1. 観点ごとに指摘件数をカウントする。横断チェックの所見は観点 `横断` として含める。セカンドオピニオンは先に `cross-review.md` の「結果の扱い」で検証・分類し、検証済みで自分側と重複しないものを観点 `second opinion` として含める。到達性コンテキストに exposure findings があれば観点 `到達性・公開範囲の変更` として含める。実行しなかった観点は 0 件と数えず、カウント行・サマリー表・📁 では `未実行` と書く（`--focus` 時の `横断` と `second opinion`、`--no-cross-review` 時・`cross-review.md` が読めないとき・`skill-cross-review` が `skipped` / `failed` を返したときの `second opinion`、解決しなかった到達性）。🔁 節と 🧪 節では、それぞれの文書の定めどおり `未実施（理由）` と書く。
+1. 観点ごとに指摘件数をカウントする。横断チェックとファミリー外のレビューの所見は、観点 `横断`・`ファミリー外` として含める（`--focus` 時と、`<OTHER_FILES>` が無いときの `ファミリー外` は `未実行`）。セカンドオピニオンは先に `cross-review.md` の「結果の扱い」で検証・分類し、検証済みで自分側と重複しないものを観点 `second opinion` として含める。到達性コンテキストに exposure findings があれば観点 `到達性・公開範囲の変更` として含める。実行しなかった観点は 0 件と数えず、カウント行・サマリー表・📁 では `未実行` と書く（`--focus` 時の `横断` と `second opinion`、`--no-cross-review` 時・`cross-review.md` が読めないとき・`skill-cross-review` が `skipped` / `failed` を返したときの `second opinion`、解決しなかった到達性）。🔁 節と 🧪 節では、それぞれの文書の定めどおり `未実施（理由）` と書く。
    起動ゲートで外した focus は、その観点の件数に `（未実行: Focus X 起動条件なし）` を併記する。security 系の担当の出力に `確認できなかった範囲` 節が無い、またはエラー・拒否文で終わっている場合、その focus を 0 件として数えず「失敗」とし、成功した focus 分の件数に `（失敗: focus X）` を併記して、`確認できなかった範囲` に `focus X: 出力不完全（再実行を推奨）` を載せる。「該当なし」でも節があれば正常として扱う: 「0 件」と「実行できていない」を出力上区別するため。
-2. 各指摘がその担当に渡した対象ファイル（ファミリーの `<TARGET_FILES>` と、起動ゲートで足したファイル）を参照しているか検証し、対象外は警告付きで分離する。
+2. 各指摘がその担当に渡した対象ファイル（ファミリーの `<TARGET_FILES>` と、起動ゲートで足したファイル。`ファミリー外` は `<OTHER_FILES>`）を参照しているか検証し、対象外は警告付きで分離する。あわせて各指摘の行番号を、`<REPO_ROOT>` の実ファイルを Read して確かめ、指摘内容と合わない行なら正しい行に引き直す（サブエージェントは行番号を取り違えることがあり、ずれた行は PR へのインライン投稿で拒否される）。
 3. 統合は「同一ファイル・同一行・同一の focus 見出し（逐語一致）」の場合のみ行い、統合時は元の観点名を併記する。サブエージェントが見出しを言い換えていた場合は、言い換えのまま統合せず focus block の見出しに引き直す。ただし観点 `到達性・公開範囲の変更` は focus block ではないので引き直さない。
 4. 重複統合の後・反証の前に、security 系の指摘の重要度を確定する。`重要度案` を採用し、根拠が `output-discipline.md` の軸に沿っていない場合だけ調整して、調整した旨と理由を指摘に注記する。iac の指摘は、権限過剰・本番影響・apply が壊れる（count / for_each の apply 時依存、破壊的な lifecycle）を Must、命名・module 境界・未使用宣言など保守性を Should、表現の一貫性・将来の改善余地を Nice とする。
 5. 調整後の security 系の Must 候補（観点 `到達性・公開範囲の変更` を除く）が 1 件以上あれば、`<SEC_DIR>/references/must-verification.md` を Read し、その契約で `general-purpose` の反証サブエージェントを 1 体起動して Must 候補をまとめて渡す（`<REACHABILITY_CONTEXT>`・対象ファイル・base も渡す）。判定は次のとおり反映し、以降のカウント・サマリー表・詳細は反映後の重要度で出す。
@@ -147,8 +159,8 @@ supply-chain の focus は、`<SEC_DIR>/SKILL.md` の「Subagent Prompt Shape」
    - 取り下げ: 指摘リストから外し、`## 🧪 反証で格下げ・取り下げた指摘` に証拠つきで列挙する。黙って消さない。
 
    Read 失敗・反証サブエージェントの失敗は止めず、Must を維持して `## 🧪 反証で格下げ・取り下げた指摘` の先頭行を `未実施（<理由>）` とする。候補単位で未実施のものは、その Must の詳細行の末尾に `（反証: 未実施・出力不完全）` と注記する。補助なので fail closed にしない。
-6. `観点別カウント: <観点>: N件, …, 横断: N件, 到達性・公開範囲の変更: N件, second opinion: N件 (合計N件) → 重複統合M件 → 反証取り下げK件 → リストN-M-K件` を出力し、差分があれば原因を明記する。`未実行` の観点は件数の代わりに `未実行` と書き、続けて `対象ファイルなし: <ファミリー名の列挙>` を 1 行出す（無ければ `なし`）。以降の出力順は 🌐 到達性コンテキスト → 📊 サマリー → 重要度別の詳細 → 🧪 反証 → 🔁 セカンドオピニオン → 🔍 確認できなかった範囲（security 系） → 📁 レビュー範囲とする。
-7. `## 🌐 到達性コンテキスト` として `<REACHABILITY_CONTEXT>` の review-reachability の表をそのまま出す（JSON ブロックは出さない。`未解決` / `未実行` のときはその旨と理由の 1 行）。続けて観点 × 重要度のサマリー表を出す。行は起動した観点と `横断` / `到達性・公開範囲の変更` / `second opinion` / 合計。各セルは件数で、指摘がなければ `0`、実行しなかった行は `未実行` とする。
+6. `観点別カウント: <観点>: N件, …, 横断: N件, ファミリー外: N件, 到達性・公開範囲の変更: N件, second opinion: N件 (合計N件) → 重複統合M件 → 反証取り下げK件 → リストN-M-K件` を出力し、差分があれば原因を明記する。`未実行` の観点は件数の代わりに `未実行` と書き、続けて `対象ファイルなし: <ファミリー名の列挙>` を 1 行出す（無ければ `なし`）。以降の出力順は 🌐 到達性コンテキスト → 📊 サマリー → 重要度別の詳細 → 🧪 反証 → 🔁 セカンドオピニオン → 🔍 確認できなかった範囲（security 系） → 📁 レビュー範囲とする。
+7. `## 🌐 到達性コンテキスト` として `<REACHABILITY_CONTEXT>` の review-reachability の表をそのまま出す（JSON ブロックは出さない。`未解決` / `未実行` のときはその旨と理由の 1 行）。続けて観点 × 重要度のサマリー表を出す。行は起動した観点と `横断` / `ファミリー外` / `到達性・公開範囲の変更` / `second opinion` / 合計。各セルは件数で、指摘がなければ `0`、実行しなかった行は `未実行` とする。
 
 ```markdown
 ## 📊 レビューサマリー
@@ -158,6 +170,7 @@ supply-chain の focus は、`<SEC_DIR>/SKILL.md` の「Subagent Prompt Shape」
 | go/architecture | 0 | 0 | 0 | 0 |
 | … | | | | |
 | 横断 | 0 | 0 | 0 | 0 |
+| ファミリー外 | 0 | 0 | 0 | 0 |
 | 到達性・公開範囲の変更 | 0 | 0 | 0 | 0 |
 | second opinion | 0 | 0 | 0 | 0 |
 | **合計** | 0 | 0 | 0 | 0 |
@@ -177,6 +190,6 @@ supply-chain の focus は、`<SEC_DIR>/SKILL.md` の「Subagent Prompt Shape」
 ```
 
 9. 重要度別の詳細のあと（`確認できなかった範囲` より前）に、まず `## 🧪 反証で格下げ・取り下げた指摘` を出す。先頭行は固定文言の 3 状態のどれかにする: `対象なし（security の Must 候補 0 件）` / `実施: N 件を検証、格下げ X 件・取り下げ Y 件`（その下に格下げ・取り下げを証拠つきで列挙する） / `未実施（理由）`。続けて `cross-review.md` の「出力」に従って `## 🔁 セカンドオピニオン（<reviewer>）` 枠を出す。実行しなかった・失敗した場合も `未実施（理由）` の 1 行を出す。最後に `## 🔍 確認できなかった範囲（security 系）` を出し、ここを集約先とする: security 系の各 focus・反証エージェント・到達性（review-reachability の末尾節。表だけを出し末尾節を捨てない）の「確認できなかった範囲」、失敗 focus の出力不完全、切り詰めの報告を重複を除いてまとめる。
-10. 最後に `## 📁 レビュー範囲` として、ファミリーごとに `<TARGET_FILES>`（サブエージェントに渡したファイル。起動ゲートで足したファイルも含む）と `<TRUNCATED_FILES>`（差分本文から落ちたファイル）を列挙し、focus 見出しごとに `実行` / `未実行（理由）` / `失敗` を 1 行で書く。`横断`・`到達性・公開範囲の変更`・`second opinion` も 1 行ずつ書く。呼び出し元（`dotfiles-review-and-act`）が前回指摘の解決確認で「今回どのファイルをどの focus で見たか」を判定する根拠にする。
+10. 最後に `## 📁 レビュー範囲` として、ファミリーごとに `<TARGET_FILES>`（サブエージェントに渡したファイル。起動ゲートで足したファイルも含む）と `<TRUNCATED_FILES>`（差分本文から落ちたファイル）を列挙し、focus 見出しごとに `実行` / `未実行（理由）` / `失敗` を 1 行で書く。`ファミリー外` は `<OTHER_FILES>` を列挙して `実行` / `未実行（理由）` を書き、`横断`・`到達性・公開範囲の変更`・`second opinion` も 1 行ずつ書く。呼び出し元（`dotfiles-review-and-act`）が前回指摘の解決確認で「今回どのファイルをどの focus で見たか」を判定する根拠にする。
 
 全観点で指摘がなかった場合は `全観点でレビューの指摘はありません` と明記し、起動ゲートで外した focus・失敗した focus・反証未実施・到達性未解決・確認できなかった範囲があればその旨を併記し、指摘なしを安全と読ませない。

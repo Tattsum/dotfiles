@@ -16,7 +16,7 @@ PR をレビューし、**所有者で次アクションを振り分ける**エ�
 ## Input
 
 - 対象 PR: 引数に URL / 番号があればそれを使う。無ければ現在ブランチから解決する。
-- `--base=<branch>`: optional。以降の `<base>` はこの値。無ければ節1 の `baseRefName` から `origin/<baseRefName>` とする（`git rev-parse --verify --quiet origin/<baseRefName>` が失敗したら、節3 より前に節4 の `skill-resolve-diff` を `--base` なしで実行し、既定解決で返った `base` を使う）。既定解決（`origin/master`、無ければ `origin/main`）に頼らないのは、stacked PR や main を向く PR で PR の実際の base と食い違うため。節3 の commit 収集、節4 の差分、`dotfiles-code-review` への `--base` のすべてで同じ `<base>` を使う。
+- `--base=<branch>`: optional。以降の `<base>` はこの値。無ければ節1 の `baseRefName` から `origin/<baseRefName>` とする（`git -C <REPO_ROOT> rev-parse --verify --quiet origin/<baseRefName>` が失敗したら、節3 より前に節4 の `skill-resolve-diff` を `--base` なしで実行し、既定解決で返った `base` を使う）。既定解決（`origin/master`、無ければ `origin/main`）に頼らないのは、stacked PR や main を向く PR で PR の実際の base と食い違うため。節3 の commit 収集、節4 の差分、`dotfiles-code-review` への `--base` のすべてで同じ `<base>` を使う。
 - `--no-cross-review`: optional。`dotfiles-code-review` へそのまま渡し、セカンドオピニオンを実行させない。
 
 ## Workflow
@@ -34,7 +34,7 @@ gh api user -q .login
 対象 PR（引数指定が無ければ現在ブランチから解決）。body は次節のコンテキスト収集で使う（リンク抽出元）。base 側は baseRefName だけを取る。gh には base リポジトリを返すフィールドが無く（headRepository / headRepositoryOwner は head 側専用）、baseRepository を渡すと Unknown JSON field で即座に落ちてこのコマンド自体が失敗する。
 
 ```bash
-gh pr view [<PR番号 or URL>] --json number,author,url,headRefName,baseRefName,isCrossRepository,body
+gh pr view [<PR番号 or URL>] --json number,author,url,headRefName,headRefOid,baseRefName,isCrossRepository,body
 ```
 
 **投稿先の `owner/repo`**（「コメント投稿手順」の `skill-review-state <owner/repo> <pr番号>` と REST 呼び出しに渡す値）は、上で取得した `url`（`https://github.com/<owner>/<repo>/pull/<N>`）から導く。PR は必ず base リポジトリ側に存在するため、fork からの PR（`isCrossRepository == true`）でもこの url は base 側を指す。`headRepositoryOwner` を使うと fork 元へ投稿しようとして失敗する。
@@ -47,6 +47,21 @@ gh pr view [<PR番号 or URL>] --json url \
 - `author.login == 自分の login` → **自分 PR（改修モード）**
 - 不一致 → **他人 PR（投稿モード）**
 
+最後に、PR の head を展開した作業ツリーを `<REPO_ROOT>` として決める。以降の git・`skill-resolve-diff`・`dotfiles-code-review` はすべてここを対象にする。
+
+- **自分 PR（改修モード）**: 現在のブランチ（`git rev-parse --abbrev-ref HEAD`）が `headRefName` なら、そのルート（`git rev-parse --show-toplevel`）を `<REPO_ROOT>` とする。HEAD が `headRefOid` より進んでいても（push 前のコミット）そのまま使う。改修はこの作業ツリーで行い、commit / push もここから行うため。ブランチが違えば止めて、PR のブランチに切り替えるかをユーザーに確認する。worktree は作らない（作ると改修と commit が別の作業ツリーに分かれ、改修が push されない）。
+- **他人 PR（投稿モード）**: 現在の作業ツリーで `git rev-parse HEAD` が `headRefOid` と一致すれば、そのルートを `<REPO_ROOT>` とする。一致しなければ、対象リポジトリのローカルのクローン（場所が分からなければユーザーに確認する）で PR の head と base を取得し、別の worktree に展開して `<REPO_ROOT>` とする。作業中のブランチと作業ツリーを動かさないため。fetch はクローンの `.git` に書き込むので、クローンがセッションの書き込み可能な作業ディレクトリに入っている必要がある（Claude Code では `/add-dir`）。
+
+```bash
+git -C <クローン> fetch origin pull/<N>/head:refs/remotes/origin/pr/<N> <baseRefName>
+```
+
+```bash
+git -C <クローン> worktree add --detach "$TMPDIR/pr-<N>" refs/remotes/origin/pr/<N>
+```
+
+  worktree を作ったときは、レビューと投稿が終わったら `git -C <クローン> worktree remove <REPO_ROOT>` で外す。
+
 ### 2. あいまい時は止めて確認（fail-safe・必須）
 
 次のいずれかに当てはまり所有者を確信できないときは、**投稿もコード編集も行わず**、ユーザーに確認する。誤って他人 PR に push する／自分 PR にレビュー爆撃する事故（外向き・不可逆）を防ぐため、推測で進めない。
@@ -54,7 +69,7 @@ gh pr view [<PR番号 or URL>] --json url \
 - 現在ブランチに対応する PR が見つからない
 - 該当 PR が複数ある
 - `gh` の API が失敗する / author を取得できない
-- 引数の PR と現在ブランチが食い違う
+- 改修モードで、引数の PR と現在ブランチが食い違う（投稿モードでは食い違ってよい。節1 のとおり worktree に展開する）
 
 確認の型: 「対象 PR が特定できませんでした。どの PR を対象にしますか？」「この PR は自分/他人のどちらとして扱いますか（改修 or 投稿）?」
 
@@ -78,7 +93,7 @@ gh pr view [<PR番号 or URL>] --json url \
   未認証/権限エラーなら「認証要」「権限不足」と種別を明示（勝手に認証しない）。
 - 関連 PR: `gh pr view <番号 or URL> --json title,body` で取得し取り決め・依存を要約。
 - GitHub issue（Closes/Fixes #N・issues URL）: `gh issue view <番号 or URL> --json title,body` で取得し、課題・受け入れ基準を要約。
-- commit メッセージ: `git log <base>..HEAD --format='%h%n%B'` で全 commit の本文を取得し、各 commit が語る**意図**（何を・なぜ変えるか）を要約する。形式（Emoji/Title/Reason/Specification）の規約適合は**判定しない**。本文が `wip` / `tmp` / `fix` / `typo` 等で**意図の記載が無い commit は「意図記載なし」として流す**（齟齬を作らない）。
+- commit メッセージ: `git -C <REPO_ROOT> log <base>..HEAD --format='%h%n%B'` で全 commit の本文を取得し、各 commit が語る**意図**（何を・なぜ変えるか）を要約する。形式（Emoji/Title/Reason/Specification）の規約適合は**判定しない**。本文が `wip` / `tmp` / `fix` / `typo` 等で**意図の記載が無い commit は「意図記載なし」として流す**（齟齬を作らない）。
 - Figma: 取得しない。「デザイン参照あり: <URL>（自動取得不可・手動確認）」の1行のみ。
 - 外部ドメインの任意 URL: 取得しない（存在のみ列挙）。
 
@@ -105,19 +120,17 @@ token/鍵/環境変数/内部パスを出力に含めない。
 
 ### 4. レビュー実行（dotfiles-code-review へ委譲）
 
-まず PR 全体の差分を取る。節5 の仕様適合チェックと、下記のインラインレビューに使う（`dotfiles-code-review` の差分はファミリーの pathspec で絞られ、README・設定ファイル・他言語が入らないため）:
+まず PR 全体の差分を取る。節5 の仕様適合チェックに使う（`dotfiles-code-review` の差分はファミリーの pathspec で絞られ、README・設定ファイル・他言語が入らないため）:
 
 ```bash
-skill-resolve-diff --base <base>
+cd <REPO_ROOT> && skill-resolve-diff --base <base>
 ```
 
 `files` を `<PR_FILES>`、`diff` を `<PR_DIFF>` として保持する。`truncated` が true なら、`truncated_files` は仕様適合チェックで必要な範囲を Read で補う。
 
-続けて Skill ツールで `dotfiles-code-review` を**このセッションでインラインに 1 回**実行し、`--base` と `--no-cross-review`（指定があれば）をそのまま渡す。サブエージェントに包んで起動しない: 包むと中継と統合だけを担う層が 1 段増え、その中では focus サブエージェントを起動できずにレビューが止まる。言語の判定・到達性・配備とサプライチェーン・セカンドオピニオン・Must の反証は `dotfiles-code-review` が差分全体に対して 1 回ずつ行うので、ここでは再実装しない。
+続けて Skill ツールで `dotfiles-code-review` を**このセッションでインラインに 1 回**実行し、`--base`・`--repo-dir <REPO_ROOT>`・`--no-cross-review`（指定があれば）を渡す。サブエージェントに包んで起動しない: 包むと中継と統合だけを担う層が 1 段増え、その中では focus サブエージェントを起動できずにレビューが止まる。言語の判定・到達性・配備とサプライチェーン・セカンドオピニオン・Must の反証は `dotfiles-code-review` が差分全体に対して 1 回ずつ行うので、ここでは再実装しない。
 
 出力（Must / Should / Nice の重要度別指摘リスト。観点 `到達性・公開範囲の変更` と `second opinion` を含む）を `<FINDINGS>` として保持する。セカンドオピニオンの未検証の指摘は `<FINDINGS>` に入れず、会話への報告だけに使う。
-
-`dotfiles-code-review` の対象に go / ts / php のファイルが無い場合（`対象ファイルなし` に go・ts・php がすべて挙がった、または `レビュー対象の変更がありません` を返した）は、`<PR_FILES>` のうち `## 📁 レビュー範囲` に載っていないファイルを、グローバル指示の「基本観点」（レイヤー境界 / エラー処理 / 命名・可読性 / テスト / セキュリティ / パフォーマンス）でインラインレビューし、その指摘を `<FINDINGS>` に加える。iac や supply-chain が見たファイルは重ねて見ない。
 
 ### 5. 仕様適合チェック（オーケストレーター自身が実施）
 
@@ -208,9 +221,9 @@ skill-review-state <owner/repo> <pr番号>
 
 ### 前回指摘の解決確認（必須・3状態）
 
-前回投稿した指摘が今回のレビューで再検出されなかった場合、**黙って消さない**。次の3状態に振り分けて会話に報告する。判定根拠は `dotfiles-code-review` の `## 📁 レビュー範囲`（今回サブエージェントに実際に渡したファイルと、観点ごとの実行状況）。`<TRUNCATED_FILES>` に載ったものは差分本文からは落ちたが `Read` 補完対象なのでスコープ内とみなす。節4 のインラインレビューで見たファイルは、基本観点で見たものとして同様に扱う:
+前回投稿した指摘が今回のレビューで再検出されなかった場合、**黙って消さない**。次の3状態に振り分けて会話に報告する。判定根拠は `dotfiles-code-review` の `## 📁 レビュー範囲`（今回サブエージェントに実際に渡したファイルと、観点ごとの実行状況）。`<TRUNCATED_FILES>` に載ったものは差分本文からは落ちたが `Read` 補完対象なのでスコープ内とみなす。`ファミリー外` の行に載ったファイルは、基本観点で見たものとして同様に扱う:
 
-- **解消（確認済み）**: 前回指摘のファイルが**差分本文に含まれ**（`<TARGET_FILES>` にあり、かつ `<TRUNCATED_FILES>` に無い）、前回指摘の focus（見出し）が `## 📁 レビュー範囲` で `実行` で（`未実行` / `失敗` でない。`second opinion`・`横断`・`到達性・公開範囲の変更` 由来ならその行が `実行`）、かつ再検出されなかった → 直ったとみなす。該当スレッドが未解決なら `first_comment_id` に「解消を確認」と**返信**してよい（スレッドの resolve はしない。settled 化は人間に委ねる）。
+- **解消（確認済み）**: 前回指摘のファイルが**差分本文に含まれ**（`<TARGET_FILES>` にあり、かつ `<TRUNCATED_FILES>` に無い）、前回指摘の focus（見出し）が `## 📁 レビュー範囲` で `実行` で（`未実行` / `失敗` でない。`second opinion`・`横断`・`ファミリー外`・`到達性・公開範囲の変更` 由来ならその行が `実行`）、かつ再検出されなかった → 直ったとみなす。該当スレッドが未解決なら `first_comment_id` に「解消を確認」と**返信**してよい（スレッドの resolve はしない。settled 化は人間に委ねる）。
   - **切り詰めで落ちたファイル（`<TRUNCATED_FILES>` にある前回指摘）は、返信しない**。`Read` 補完はサブエージェント任せで、本当に読んだ保証が無い。読んでいないファイルに「解消を確認」と外向き投稿すると、直っていないものを直ったと公言する（`skill-resolve-diff` で潰したのと同じ false 解消）。会話に「解消の可能性（切り詰めのため未確定）」として報告するに留める。
 - **未再検出（今回スコープ外・要確認）**: 前回指摘のファイルが `<TARGET_FILES>` に無い、または前回指摘の focus（見出し）が今回 `未実行` / `失敗` だった、または投稿本文から前回指摘の focus を特定できない → 今回は見ていない（見たと断定できない）。返信も削除もせず、会話に「要確認」として残す。
 - **継続**: 今回も再検出された → 上記「照合ルール」に従い、返信で更新するか維持する。
@@ -219,6 +232,7 @@ skill-review-state <owner/repo> <pr番号>
 
 - **本文にアカウント ID・ARN を含めない**。到達性コンテキストを根拠にする指摘は、リソース種別と名前で書く。PR コメントは外向き・不可逆で、他の閲覧者にも残るため。投稿前に本文を見直し、含まれていたら書き換える。
 - **すべての指摘・提案・質問はコード行に紐づくインラインコメント**で行う（general comment に箇条書きで並べない）。例外は PR 要約など行に紐づけられない内容のみ。
+- 一括投稿の前に、各コメントの `line` が差分の hunk に入っているかを確かめる。`git -C <REPO_ROOT> diff <base>...HEAD -- <path>` の `@@ -a,b +c,d @@` のうち、新しい側の `c` 〜 `c+d-1` 行に入っていればよい。入らない行は、同じ論点に関わる hunk 内の行へ付け替え、本文で元の行を示す。hunk の外の行が 1 件でもあると、一括投稿は 422（`Line could not be resolved`）で全体が拒否される。
 - `POST /pulls/{pr}/reviews`（一括投稿）は無効行を無言でドロップし得る。送信後は `skill-review-state`（または `gh api ... --paginate`）で登録件数・行マッピングを照合し、欠落時は個別 `POST /pulls/{pr}/comments`（1件ずつ）で再投稿する。
 - 最終確認で重複（同一 `path` × 同一観点のスレッドが2つ以上）を見つけたら、**削除はせず** `⚠️ 重複候補: <URL> と <URL>` として会話に報告する。他人 PR 上のコメント削除は外向き・不可逆で、`is_outdated` により `line` が null に潰れると削除対象の判定自体を誤る（人間の返信を消しかねない）。削除は人間が判断する。
 
