@@ -99,7 +99,7 @@ skills/
     │   ├── SKILL.md
     │   └── references/focus-blocks.md
     ├── prompt-pattern-scan/SKILL.md            # プロンプト履歴から繰り返し作業を抽出しスキル化候補を出す
-    ├── grill-me/SKILL.md                       # 設計・計画を bounded なラウンドで問い詰める（明示起動のみ）
+    ├── grill-me/SKILL.md                       # 設計・計画を bounded なラウンドで問い詰める（明示起動、または plan-first の合意フェーズから）
     └── dotfiles-nippo/SKILL.md                 # ログ・議事録・Jira/Confluence/Slack/GitHub から本人の作業に絞って日報を生成
 ```
 
