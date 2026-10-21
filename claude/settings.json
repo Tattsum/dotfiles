@@ -26,7 +26,8 @@
     "claude-code-setup@claude-plugins-official": true,
     "swift-lsp@claude-plugins-official": true,
     "codex@openai-codex": true,
-    "yappli-vuln-assessment-shared@yappli-marketplace": true
+    "yappli-vuln-assessment-shared@yappli-marketplace": true,
+    "linkify@claude-linkify": true
   },
   "extraKnownMarketplaces": {
     "openai-codex": {
@@ -39,6 +40,12 @@
       "source": {
         "source": "github",
         "repo": "fastmedia/claude-code-marketplace"
+      }
+    },
+    "claude-linkify": {
+      "source": {
+        "source": "github",
+        "repo": "babarot/claude-linkify"
       }
     }
   },
