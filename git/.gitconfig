@@ -4,7 +4,14 @@
 [user]
 	name = tattsum
 	email = kurohari35@gmail.com
+	signingkey = ssh-rsa AAAAB3NzaC1yc2EAAAADAQABAAACAQDI6+BOBPKcHQPUNi1mShfYk7qsBzucU3I0jakc6mi9f2amSyWshbGyVXC8rEdOjw6FSdULkwVsbMpqTo07lvnQmDh45cH3ZUQgsV8OFmwnD/qLjVyvA+BatJmT+p+FJucO6g/QpWpE+VhYTDYxfu5Svr+1Cdt4Y7BHKn5STC1z23drdWY7h/cWGlzHNs7Vb2VcCADcuMCGoehFSKIJJ+3DDkTpgIUs8hCh58lp+qf7cTmKxrkXgggX7PJ9RwTRFqrieLmKQipyTJsPmXgdpeordQ3bZbgL6/KcEP+a/J3vPz8ccv3bL+LcScgQdRC84a+qyGtkwBgSzn4kmO1FU8P5ntWvT4CBM6WUX67upG4w1rYqxImSXrGhMWkFS/EKU50kerV19PRAQjwKd7F60VsQJXFz3FzvZvWDfhaqD5b54e3YXZLOnBD+dUvU1bhwJqiHChRtvyeHB3xDQ4P5lvpn6+AAenV6X04J7DguiatF8rN7sbPwDLzmH6VGACjcrUSl2V9oKmrz/3B7FrFv/RFwl+Co59L9XkfkVXw13RSyWA4dFd/klSDL+1PXQ4PPdhDYqpNcL7AGbDzDU2qAle/NU7Pt1czlQbCWJl+RAICmgVpIUQcXYLAn+9A/lbErhQ+z9UY5b9Nfs0533z3zHgB6nyD0GK23l9sG6owxNGXGoQ==
 
 [core]
 	excludesfile = ~/.gitignore_global
 
+[gpg]
+	format = ssh
+[gpg "ssh"]
+	program = /Applications/1Password.app/Contents/MacOS/op-ssh-sign
+[commit]
+	gpgsign = true
