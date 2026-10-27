@@ -8,4 +8,5 @@
   - skill: `skills/src/<skill-id>/`、skill から呼ぶスクリプト: `bin/skill-*`
 - 設定ファイルを増やしたら `install.sh` に `link_file` を足す。`install.sh` は `~` 配下に書き込むので、実行は人間に頼む。
 - `bin/` のスクリプトを変えたら、対応する `tests/<name>-test.sh` を実行する。
+- `bin/` に Go・Rust のスクリプトを初めて足すときは、`install.sh` での配り方とテストの形を先に人間と決める。
 - public リポジトリなので、社内の固有名・社内リポジトリ名・絶対パス・トークンを書かない。
