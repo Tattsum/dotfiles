@@ -24,6 +24,11 @@ sandbox の書き込み禁止パス（このセッションの Bash ツールの
 - macOS の `mktemp -d`（引数なし）と `mktemp -t` は TMPDIR を使わず `/var/folders` に作るので、sandbox 内では `mktemp -d "${TMPDIR:-/tmp}/<名前>.XXXXXX"` の形で書く
 - sandbox 内のプロセス置換 `<(...)` は、`/dev/fd` を許可しても `Operation not permitted` で失敗する（設定では直らない）。`$TMPDIR` に中間ファイルを書いてから渡す
 
+## Go・Rust のツールと sandbox
+
+- 依存を取得する cargo（crates を落とす `cargo build` など）は、Bash の `allowed_domains` に `index.crates.io` と `static.crates.io` を宣言して実行する。settings の常時許可には足さない（crates の `build.rs` はビルド時に任意のコードを実行するので、都度の審査を残す）
+- sandbox 内の `go install` は `GOBIN` を一時ディレクトリに向ける。`~/go/bin` は sandbox から書けない（PATH 上で `/usr/bin` より前にあり、置いたバイナリが sandbox の外で `ssh` などの代わりに実行されるので外した）
+
 ## AWS と本番
 
 - sandbox 内の AWS CLI は SSO のキャッシュ（`~/.aws/cli/cache`）に書けない。`aws sso login` の直後はすべての aws コマンドがこれで落ちる。そうでなくても ECS などの API はプロキシで拒否される（`rds-data` と `logs` は通る。プロキシへの接続エラーなら sandbox、AWS の API エラーなら疎通できている）

@@ -72,7 +72,6 @@
       "allowWrite": [
         "~/Library/Caches/go-build",
         "~/go/pkg/mod",
-        "~/go/bin",
         "~/Library/Caches/golangci-lint",
         "~/.cache/golangci-lint",
         "~/.cargo/registry",
