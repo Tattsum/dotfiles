@@ -7,12 +7,13 @@ Use one block per subagent. Keep each subagent constrained to its assigned block
 Review `any` usage, unknown/generics, and validation of external data.
 
 - Avoid `any`. Prefer `unknown` + narrowing, generics, or an explicit type. `any` disables checking and silently propagates.
-- External data (API responses, `localStorage`, URL params, `postMessage`) is untyped at runtime. Validate it (e.g. `zod` / `io-ts` / a manual guard) before trusting the static type; a bare `as ResponseType` cast is a lie the compiler cannot check.
+- External data (API responses, `localStorage`, URL params, `postMessage`) is untyped at runtime. Validate it (e.g. `zod` / `io-ts` / a manual guard) before trusting the static type; a bare `as ResponseType` cast is a lie the compiler cannot check. Keep one source for the shape: derive the static type from the runtime schema (`z.infer<typeof schema>`) or generate the validator from the type, instead of hand-writing a `type` beside the schema that drifts when only one is edited.
 - Avoid non-null assertions (`!`) and unchecked casts (`as`) used to silence the compiler; they move failures to runtime. Narrow instead.
 - Do not weaken types to make an error disappear (widening to `any`, adding `?` everywhere); fix the underlying shape.
 - A cast also suppresses detection of *future* type changes: code that casts around a union keeps compiling when a new variant is added. Prefer validation, `as const`, or a shape that forces a type error on the missing case (e.g. an exhaustive `switch` whose default assigns to `never`). A cast that exists so a new variant will not break the build is a defect.
 - Do not mark a prop/parameter optional (`?`) or give it a default when the caller always supplies it. Use a required `T | undefined` union so a forgotten argument is a compile error instead of a silent `undefined`.
 - Flag fallbacks that paper over a missing value — `?? ""`, `?? 'default'`, default parameters. An empty or absent value is often the bug itself; the fallback hides it. Surface the absence (fail fast, or type it `T | undefined`) rather than defaulting.
+- A normalization added only to accommodate an emulator or test double (e.g. mapping a sentinel `0` to "unset") also runs in production, where a real value equal to the sentinel is misread and a downstream guard is bypassed. Scope it to that environment, or fail on the unexpected value.
 
 Report only type choices that let malformed data or `undefined` reach code that assumes otherwise.
 
@@ -25,8 +26,8 @@ Review shared type definitions, discriminated unions, and TypeScript idioms.
 - Use `readonly` / `as const` for values that must not mutate, and prefer precise literal/enum types over bare `string`/`number` where the set is known.
 - Follow the project's existing conventions for `interface` vs `type`, import style, and file layout instead of introducing a new pattern.
 - Use `Number.isNaN()` for `number`-typed values, not the global `isNaN()`, which coerces its argument and returns `true` for non-numeric strings.
-- Use stable IDs — not display names — as keys, option values, and map keys. Display names collide (a user can name a field literally `URL`) and change, silently breaking lookups.
-- In i18n'd UIs, keep translation keys identical across locales (same key set, same namespace) and keep sentence-ending punctuation consistent per locale; reuse an existing message key instead of adding a near-duplicate. A key present in one locale but missing in another is a defect.
+- Use stable IDs — not display names — as keys, option values, and map keys. Display names collide (a user can name a field literally `URL`) and change, silently breaking lookups. A displayed path or slug that two entities can share (a variant row and its parent) is no key either: carry the id from the selection through to the save.
+- In i18n'd UIs, keep translation keys identical across locales (same key set, same namespace) and keep sentence-ending punctuation consistent per locale; reuse an existing message key instead of adding a near-duplicate. A key present in one locale but missing in another is a defect. A key name must not contradict its message (a `Skip…` key whose text says "include"), and the same setting uses the same term on every screen.
 - In an i18n'd UI, do not hardcode user-visible strings inline; register them in the locale resource (e.g. `ja.json`) and reference the key. A literal string in JSX/template is invisible to the translation pipeline and drifts out of sync.
 
 Report only concrete type-organization risks that cause drift or allow invalid states, not subjective style.
@@ -39,6 +40,9 @@ Review design-system adherence, spacing ownership, and accessible markup.
 - A reusable component should not carry external margin (`mt-2` etc.). Outer spacing is the parent/layout's responsibility; a component that pushes on its surroundings cannot be placed freely.
 - Prefer design-system components over raw markup for inputs, buttons, labels, and fields; override only the specific bit that must differ (e.g. a selected style), not the whole element.
 - Use semantic HTML and framework primitives for accessibility: `<button>` / `role="button"` for clickable elements (not a clickable `<div>`), the router's link component (`next/link` etc.) for navigation instead of `onClick`, and never nest an `<a>` inside a `<button>`. Decorative images take `alt=""`.
+- An icon-only control needs an accessible name that is actually computed (`aria-label`, `aria-labelledby`, or visible text); a tooltip alone does not guarantee one. When replacing a text field or a click-to-edit UI, keep a keyboard path to the same action.
+- Do not pass `onClick` to a table-row component that rewrites the row's role (e.g. to `role="button"`): it removes table semantics and adds a focus stop with no key handler. Navigate through a link inside the row.
+- When a permission or state disables an interaction, derive every affordance that promises it (drag handle, move cursor, the trigger of a menu that is now empty) from the same condition, and check that the disabling reaches children: an `<a href>` child stays natively draggable whatever the parent's `draggable={false}`, and `fieldset disabled` covers only form controls in its own DOM subtree, not click handlers or portal-rendered parts. A limit-reached state must not disable the control that deselects. Server-side authorization is checked separately.
 
 Report only concrete design-system/consistency/accessibility regressions visible in the changed code, deferring project-specific token names to the repo's existing usage.
 
@@ -47,6 +51,7 @@ Report only concrete design-system/consistency/accessibility regressions visible
 Review constants, dependency honesty, comment discipline, and defensive handling of unexpected input.
 
 - Extract magic numbers and repeated literals into named constants, especially a value used in more than one place (e.g. a `300000` timeout shared across files). A bare literal hides intent and drifts when only some copies are updated.
+- Do not copy into an app constant a value that infrastructure owns and operations may change (e.g. a queue's `maxReceiveCount` that the app uses to tell whether a message is still being retried). Changing it in operations then silently makes the app's display or decision wrong; read it from configuration fed by the same variable.
 - A module that reads config or secrets directly at each use site scatters what the app depends on. Aggregate environment variables and secret access into one config module that validates on load, and reference that; do not read `process.env` / `import.meta.env` ad hoc, and never read a secret as a plain env var at the point of use.
 - Comments carry *Why not* — rejected alternatives, trade-offs, pitfalls — not *What/How*, which the code, names, and tests already express. Flag comments that restate the implementation (e.g. a 14-line JSDoc narrating what the code plainly does); keep only the part a reader cannot derive from the code (e.g. which server-side definition this must stay in sync with). This mirrors the four-way information-placement rule already applied in the Go and PHP idiom focuses; justify each addition from a real occurrence in the diff, not from that symmetry.
 - Do not silently ignore unexpected or excess input (extra array elements, unhandled cases). Surface it — throw, log, or handle it explicitly — rather than dropping it and returning as if nothing was wrong.
