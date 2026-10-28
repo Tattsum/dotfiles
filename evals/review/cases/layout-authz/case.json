@@ -1,0 +1,18 @@
+{
+  "focus": "security",
+  "perspective": "ts/security",
+  "summary": "App Router の layout だけで管理者を確かめ、page はログイン済みかしか見ない",
+  "defect": {
+    "expect": [
+      {
+        "path": "app/admin/drafts/page.tsx",
+        "lines": [5, 12],
+        "min_severity": "Should",
+        "keywords": ["layout", "レイアウト", "requireAdmin", "roles.includes", "ロールの確認", "管理者の確認", "管理者ロール"]
+      }
+    ]
+  },
+  "clean": {
+    "paths": ["app/admin/drafts/page.tsx"]
+  }
+}

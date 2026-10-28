@@ -1,0 +1,18 @@
+{
+  "focus": "security",
+  "perspective": "ts/security",
+  "summary": "編集者が変えられる値を JSON.stringify だけでインライン script に埋め込む",
+  "defect": {
+    "expect": [
+      {
+        "path": "app/layout.tsx",
+        "lines": [10, 12],
+        "min_severity": "Should",
+        "keywords": ["</script>", "エスケープ", "escape", "u003c", "JSON.stringify"]
+      }
+    ]
+  },
+  "clean": {
+    "paths": ["app/layout.tsx"]
+  }
+}

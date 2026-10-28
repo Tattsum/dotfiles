@@ -12,3 +12,6 @@ claude/prompt-patterns/*.bak-*
 
 # natural-japanese の lint を uv run すると skills/src/*/scripts/ にバイトコードが生成される。
 __pycache__/
+
+# evals/review/run.sh の実行結果。claude の出力と費用を含み、実行のたびに増える。
+evals/review/results/
