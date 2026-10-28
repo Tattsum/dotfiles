@@ -27,7 +27,8 @@
     "swift-lsp@claude-plugins-official": true,
     "codex@openai-codex": true,
     "yappli-vuln-assessment-shared@yappli-marketplace": true,
-    "linkify@claude-linkify": true
+    "linkify@claude-linkify": true,
+    "claude-security@claude-plugins-official": true
   },
   "extraKnownMarketplaces": {
     "openai-codex": {
