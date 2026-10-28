@@ -197,7 +197,7 @@ cd <REPO_ROOT> && skill-resolve-diff --base <base>
 
 - 返信と本文の更新は外向きの投稿なので、草案を利用者に見せてから投稿する（他人の PR へのレビュー投稿は、既存スレッドへの返信を含めて 6-B の流れに従う）。
 - 返信は数行に絞る。設計の背景はコミットメッセージと PR 本文に寄せ、返信はそこへの入口にする。
-- 対応コミットはリンクにする。リンクの文字は短縮 SHA でよいが、URL はフル SHA にする（``[`<短縮 SHA>`](https://github.com/<owner>/<repo>/pull/<n>/commits/<full-sha>)``。PR 番号が無い・PR に属さないコミットは `https://github.com/<owner>/<repo>/commit/<full-sha>`）。フル SHA は `git rev-parse` で取り、push 済みであることを確かめてから貼る。
+- 対応コミットはリンクにする（複数あれば並べる）。リンクの文字は短縮 SHA でよいが、URL はフル SHA にする（``[`<短縮 SHA>`](https://github.com/<owner>/<repo>/pull/<n>/commits/<full-sha>)``。PR 番号が無い・PR に属さないコミットは `https://github.com/<owner>/<repo>/commit/<full-sha>`）。フル SHA は `git rev-parse` で取り、push 済みであることを確かめてから貼る。
 - 太字の閉じ `**` の直前に句読点・括弧を置かない。`**見出し。**本文` は CommonMark の規則で太字にならないので、`**見出し**。本文` と書く。投稿前に `rg -n '[。、）」』】！？：]\*\*[^\s*|]' <file>` で候補を出し、ヒットのうち太字を閉じている `**` だけを直す（句読点の直後の開きの `**` は正しく太字になる）。
 
 ### 投稿前の準備（必須）— 前回レビュー状態の取得と照合
