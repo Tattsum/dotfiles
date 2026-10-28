@@ -1,0 +1,18 @@
+{
+  "focus": "storage",
+  "perspective": "ts/storage",
+  "summary": "アプリ側の重複チェックが、一意制約（下書きのテーブルだけ）より広い範囲を見ている",
+  "defect": {
+    "expect": [
+      {
+        "path": "src/entries/save-draft.ts",
+        "lines": [20, 26],
+        "min_severity": "Should",
+        "keywords": ["公開済み", "published_entries", "正当な", "誤って", "valid", "下書きだけ", "drafts only", "編集中"]
+      }
+    ]
+  },
+  "clean": {
+    "paths": ["src/entries/save-draft.ts"]
+  }
+}
