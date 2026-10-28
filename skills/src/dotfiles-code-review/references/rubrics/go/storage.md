@@ -4,15 +4,15 @@ Use one block per subagent. Keep each subagent constrained to its assigned block
 
 ## Focus A: DB Schema Design
 
-Review migrations and table design.
+Review migrations and table design. This block assumes MySQL (collation, `ENUM`, `ON UPDATE CURRENT_TIMESTAMP`); for other engines apply only the engine-independent items.
 
-- Use `VARCHAR(255)` for non-fixed external or application strings; fixed immutable values such as UUIDs may use fixed-width types.
+- Use `VARCHAR(255)` for non-fixed external or application strings (fixed immutable values such as UUIDs may use fixed-width types) and `utf8mb4`. Choose collation by use case: `utf8mb4_0900_ai_ci` when dakuten/handakuten distinction is unnecessary, `utf8mb4_unicode_ci` when multilingual comparison matters, otherwise `utf8mb4_general_ci`. Avoid `utf8mb4_bin` unless case-sensitive comparison is required.
 - Match new table names to existing same-kind tables such as examination or snapshot tables.
 - For lifecycle status columns, consider `ENUM` or `CHECK` constraints when the value set is meaningful and stable enough.
 - Do not mix different lifecycle or business concepts in one table when a `type` column changes the meaning of other columns.
 - Avoid `ON DELETE CASCADE`; prefer explicit application-level deletion so behavior remains visible in code.
 - Do not set misleading `DEFAULT` values for fields always written by application code. Use `NOT NULL` when null is not valid; JSON array columns should default to `[]`.
-- Use `utf8mb4`. Choose collation by use case: `utf8mb4_0900_ai_ci` when dakuten/handakuten distinction is unnecessary, `utf8mb4_unicode_ci` when multilingual comparison matters, otherwise `utf8mb4_general_ci`. Avoid `utf8mb4_bin` unless case-sensitive comparison is required.
+- When a migration adds a unique index or constraint, the cleanup SQL that finds existing violations must count each constraint scope (each table, tenant, or set of states the index covers) separately. Merging scopes with `UNION` reports pairs that the final constraint accepts, so the cleanup blocks or deletes valid rows. Apply the same comparison and normalization as the application-side check (e.g. JSON null versus SQL NULL).
 - Use `DATETIME` for time columns. Define audit timestamps as:
 
 ```sql

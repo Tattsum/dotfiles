@@ -30,7 +30,7 @@ skills/
     │   ├── SKILL.md
     │   └── references/
     │       ├── rubrics/go/*.md                 # Go: architecture / idioms / storage / test / observability / grpc
-    │       ├── rubrics/ts/*.md                 # TS: architecture / idioms / state / performance / test
+    │       ├── rubrics/ts/*.md                 # TS: architecture / idioms / state / performance / storage / test
     │       ├── rubrics/php/*.md                # PHP: architecture / idioms / storage / test / observability
     │       ├── rubrics/iac/iac.md              # IaC: module 境界・ライフサイクル / 命名規約 / セキュリティ・運用シグナル
     │       └── cross-review.md                 # 別エージェント（Codex ⇄ Claude Code）の公式レビューをセカンドオピニオンとして取り込む手順

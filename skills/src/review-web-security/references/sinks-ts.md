@@ -19,10 +19,11 @@
 
 | 危険・要注意 | 安全な代替・確認点 |
 |---|---|
-| Vue の `v-html`、React の `dangerouslySetInnerHTML` | 自動エスケープを迂回する。利用者由来・外部由来の値は DOMPurify でサニタイズしてから（Trusted Types のポリシー内では `RETURN_TRUSTED_TYPE: false`） |
+| Vue の `v-html`、React の `dangerouslySetInnerHTML` | 自動エスケープを迂回する。利用者由来・外部由来の値は DOMPurify でサニタイズしてから（Trusted Types のポリシー内では `RETURN_TRUSTED_TYPE: false`）。許可する要素・属性は、必要な HTML 機能と出力先から決める。他のスクリプトが名前で参照する `id` / `name`（DOM clobbering。接頭辞を付けて名前空間を分ける手もある）と、iframe 内で親を遷移させる `target` は、出力先に応じて落とすか制限する。表示の直前に同じ関数を通し、データ供給元の整形（RSS・API で保存された HTML）は信頼しない |
 | `innerHTML` / `outerHTML` / `insertAdjacentHTML` / `document.write` | textContent・createElement・フレームワークのバインディングにする |
 | `eval` / `new Function` / 文字列を渡す `setTimeout` / `setInterval` | 関数を渡す。設定の読み込みは `JSON.parse`（結果を別の Sink へ渡すなら、その文脈の対策は別途要る） |
-| 利用者の値を `href` / `src` / `window.open` / `location.href` / `router.push` に入れる | `new URL(v, base)` の `protocol` を `http:` / `https:` の許可リストで確認する。React は 16.9.0 で `javascript:` URL を警告、19.0.0 で例外を投げる関数に置き換えるが、scheme の検証は別途必要。Vue は `javascript:` を防がない |
+| インライン `<script>` に値を埋め込む（`dangerouslySetInnerHTML` の中のテンプレート文字列、`JSON.stringify(v)`） | `JSON.stringify` は `<` を escape しないので、値に `</script>` が入ると script が終わる。出力の `<` を Unicode エスケープに置換した文字列リテラルとして埋め込む。形式検証での拒否は出力側の処理の代わりにならない |
+| 利用者の値を `href` / `src` / `window.open` / `location.href` / `router.push` に入れる | `new URL(v, base)` の `protocol` を `http:` / `https:` の許可リストで確認する。React は 16.9.0 で `javascript:` URL を警告、19.0.0 で例外を投げる関数に置き換えるが、scheme の検証は別途必要。Vue は `javascript:` を防がない。クライアントが直接書ける値やデータソース経由の値のように書込経路が複数ある URL は、入力時の検証に頼らず、描画・遷移の直前（外部 SDK の遷移 API を含む）でも同じ判定関数で検証する |
 | `fetch(location.hash.slice(1))`、`fetch(params.get('url'), { credentials: 'include' })` | 操作名から固定の method / path への対応表にする（client-side CSRF） |
 | `window.addEventListener('message', ...)` で `event.origin` を確認しない、`postMessage(data, '*')` | 受信側は `event.origin` を完全一致で確認してから `event.data` の型を検証する。送信側は具体的な targetOrigin |
 | `localStorage.setItem('token', ...)`、`localStorage.getItem('role')` で権限の表示・分岐をする | トークンは httpOnly Cookie。Storage の値を認可の根拠にしない |
@@ -49,7 +50,9 @@
 | 危険・要注意 | 安全な代替・確認点 |
 |---|---|
 | `prisma.x.findUnique({ where: { id } })` のあとに所有者の確認が無い | `where: { id, ownerId: session.user.id }`、または取得直後に認可関数 |
+| クライアントが書ける ID や参照パスを、特権（Admin SDK・内部キー）でそのままストアのパスに連結して辿る（`/projects/${projectId}`） | 単一の ID は、読む前に形式（文字種・長さ・`/` の有無）を検証する。`/` を含む値は深い階層の別ドキュメントを同じ種類のものとして解決させる。参照パス全体を受け取る設計なら、期待する親パスの配下か・種類が合うかを確かめる。検証は個別の入口でなく共通の権限関数に置き、検証済みの ID からパスを組み立て直す |
 | Next の Route Handler / Server Action / tRPC procedure の中に認可が無い | UI の出し分けは認可ではない。各ハンドラでセッションと対象の権限を確認する。Next の middleware（16.0.0 で proxy に改名）の matcher から外れたパスは素通りする |
+| 認可が Next App Router の layout にだけある（page やデータを読む側に無い） | ソフト遷移ではクライアントが `Next-Router-State-Tree` ヘッダで「その layout は取得済み」と申告でき、サーバーはそれを信じて layout を再実行せず page だけを描画する。ハードナビゲーションでも page は layout と並行して実行され、layout が 404 や拒否を返しても page のデータが応答に埋め込まれうる。認可は page の冒頭（Suspense を返す前）か、認可済みのデータアクセス層で行い、layout の判定は表示用にとどめる。ヘッダは自己申告値なので、layout の判定を障壁に数えて Likelihood を下げない（output-discipline.md の自己申告値の規則）。対象の Next.js のバージョンで確かめる |
 | `prisma.x.update({ data: req.body })`、`Object.assign(entity, req.body)`、`{ ...body }` をそのまま保存する | zod の `.strict()` などで許可したフィールドだけを取り出し、所有者・ロールはセッションから決める |
 | `res.json(row)`、Prisma の `select` を省略してモデルを返す | レスポンス用の型でフィールドを明示する |
 | 最後の管理者の削除、自分自身の降格を許す | 権限ロックアウトを拒否する |
@@ -69,6 +72,7 @@
 | 危険・要注意 | 安全な代替・確認点 |
 |---|---|
 | `fetch(url)` / `axios.get(url)` / got / undici、Puppeteer・Playwright の `page.goto(url)` に利用者の URL を渡す | 論理 ID から固定宛先へ変換する。任意 URL が必要なら名前解決後の IP を検査する |
+| 固定の宛先の URL に値を連結する（`${base}/${id}`、`?q=${v}`） | path の 1 セグメントになる値（ID・slug・uid）は `encodeURIComponent` で 1 セグメントにしたうえで、`.`・`..`・空・`/` や `\` を含む値・文字列でない値（配列は暗黙の文字列化で `..` になりうる）をエンコードに頼らず拒否する。クエリ値は連結せず `URLSearchParams` で渡す（生の `&` が別のパラメータになる）。クエリ値や検証済みの参照パスでは `/` が正当な場合があるので、セグメントの規則を持ち込まない |
 | リダイレクトを既定（`redirect: 'follow'`）のまま追う、axios の既定の追従 | `redirect: 'manual'` / axios の `maxRedirects: 0`。追うなら各ホップを再検査する |
 | timeout 未設定 | `AbortSignal.timeout()`（Node 17.3.0 / 16.14.0〜）。fetch は Node 18 からフラグ不要 |
 | `NODE_TLS_REJECT_UNAUTHORIZED=0`、`rejectUnauthorized: false` | TLS 検証を無効化しない |
