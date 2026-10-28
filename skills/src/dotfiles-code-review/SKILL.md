@@ -25,7 +25,7 @@ allowed-tools: [Bash, Read, Grep, Glob, Agent]
 | ファミリー | pathspec | OWNER と rubric | security の Sink 表 | 担当名（prompt の `<REVIEWER>`） |
 |---|---|---|---|---|
 | go | `'*.go' '*.sql' '*.proto'` | architecture / idioms / storage / test / observability / grpc: `<SKILL_DIR>/references/rubrics/go/<OWNER>.md`、security: `<SEC_DIR>/references/focus-blocks.md` | `<SEC_DIR>/references/sinks-go.md` | Go バックエンドコードレビュー |
-| ts | `'*.ts' '*.tsx' '*.js' '*.jsx' '*.vue'` | architecture / idioms / state / performance / test: `<SKILL_DIR>/references/rubrics/ts/<OWNER>.md`、security: 同上 | `<SEC_DIR>/references/sinks-ts.md` | TypeScript / Vue / React フロントエンドコードレビュー |
+| ts | `'*.ts' '*.tsx' '*.js' '*.jsx' '*.vue'` | architecture / idioms / state / performance / storage / test: `<SKILL_DIR>/references/rubrics/ts/<OWNER>.md`、security: 同上 | `<SEC_DIR>/references/sinks-ts.md` | TypeScript / Vue / React フロントエンド・サーバー側コードレビュー |
 | php | `'*.php' '*.blade.php' 'database/migrations/*'` | architecture / idioms / storage / test / observability: `<SKILL_DIR>/references/rubrics/php/<OWNER>.md`、security: 同上 | `<SEC_DIR>/references/sinks-php.md` | PHP / Laravel コードレビュー |
 | iac | `'*.tf' '*.tfvars' '*.hcl' '*.jsonnet' '*.libsonnet'` | iac: `<SKILL_DIR>/references/rubrics/iac/iac.md` | なし | IaC（Terraform / jsonnet）コードレビュー |
 | supply-chain | `'*Dockerfile*' '*.dockerfile' '*compose*.yml' '*compose*.yaml' '.github/workflows/*' '*go.mod' '*go.sum' '*composer.json' '*composer.lock' '*package.json' '*package-lock.json' '*pnpm-lock.yaml' '*yarn.lock' '*.npmrc'` | supply-chain: `<SEC_DIR>/references/focus-blocks-supply-chain.md` | なし | （review-web-security の prompt を使う。下記） |
@@ -52,7 +52,7 @@ API スキーマ:
 git -C <REPO_ROOT> diff --quiet <base>...HEAD -- ':(glob,icase)**/*.proto' ':(glob,icase)**/*.pb.go' ':(glob,icase)**/*openapi*.yaml' ':(glob,icase)**/*openapi*.yml' ':(glob,icase)**/*openapi*.json' ':(glob,icase)**/*swagger*.yaml' ':(glob,icase)**/*swagger*.yml' ':(glob,icase)**/*swagger*.json' ':(glob,icase)**/openapi/**/*.yaml' ':(glob,icase)**/openapi/**/*.yml' ':(glob,icase)**/openapi/**/*.json' ':(glob,icase)**/swagger/**/*.yaml' ':(glob,icase)**/swagger/**/*.yml' ':(glob,icase)**/swagger/**/*.json'
 ```
 
-終了コード 1（条件に当たる変更がある）なら起動し、0 なら起動せずその focus を `未実行（起動条件なし）` として扱う。起動するときは、同じ pathspec で `git -C <REPO_ROOT> diff --name-only <base>...HEAD -- <ゲートの pathspec>` を実行し、ファミリーの `<TARGET_FILES>` に無いファイル（OpenAPI の定義など）をその focus の担当の対象ファイルに足す（差分本文には入らないので、担当は Read で全文を読む）。それ以外（コマンドの失敗）なら起動する。`git diff --name-only | rg -q` のようなパイプにしない: 終了コードが rg のものになり、git の失敗が「条件なし」に化けて focus が黙って外れる。`go/grpc` の `## Focus B` はゲートしない: ステータスコードとエラー分類の指摘はハンドラやユースケースのコードに出て、仕様ファイルが変わらない差分でも起きるため。
+終了コード 1（条件に当たる変更がある）なら起動し、0 なら起動せずその focus を `未実行（起動条件なし）` として扱う。起動するときは、同じ pathspec で `git -C <REPO_ROOT> diff --name-only <base>...HEAD -- <ゲートの pathspec>` を実行し、ファミリーの `<TARGET_FILES>` に無いファイル（OpenAPI の定義など）をその focus の担当の対象ファイルに足す（差分本文には入らないので、担当は Read で全文を読む）。それ以外（コマンドの失敗）なら起動する。`git diff --name-only | rg -q` のようなパイプにしない: 終了コードが rg のものになり、git の失敗が「条件なし」に化けて focus が黙って外れる。`go/grpc` の `## Focus B` はゲートしない: ステータスコードとエラー分類の指摘はハンドラやユースケースのコードに出て、仕様ファイルが変わらない差分でも起きるため。`ts/storage` もゲートしない: 永続化の書き方（ORM・DB クライアント・キュー・独自の repository・引数で受け取る DB）は多様で、パスや import で判定すると取りこぼすため。
 
 ## Workflow
 
@@ -80,7 +80,7 @@ cd <REPO_ROOT> && skill-resolve-diff [--base <base>] -- <ファミリーの path
 
 ## Subagent Prompt Shape
 
-go / ts / php / iac の各サブエージェントには、そのファミリーの共有コンテキストと 1 つの focus を渡す。`<REVIEWER>` はファミリーの担当名、`<OWNER>` は観点名、`<RUBRIC_FILE>` はその OWNER の rubric の絶対パス、`<FOCUS_HEADING>` は手順7で列挙した見出し。go の storage 担当には差分に含まれる `.sql` ファイルも、go の grpc 担当には `.proto` ファイルも対象である旨を伝える。
+go / ts / php / iac の各サブエージェントには、そのファミリーの共有コンテキストと 1 つの focus を渡す。`<REVIEWER>` はファミリーの担当名、`<OWNER>` は観点名、`<RUBRIC_FILE>` はその OWNER の rubric の絶対パス、`<FOCUS_HEADING>` は手順7で列挙した見出し。go の storage 担当には差分に含まれる `.sql` ファイルも、go の grpc 担当には `.proto` ファイルも対象である旨を伝える。ts の storage 担当には、差分に永続化（DB・キュー・外部ストアへの読み書き）も外部 I/O も無ければ `該当なし（永続化・外部 I/O の変更なし）` と返すよう伝える。`.sql` は ts の storage 担当に渡さない（go の storage 担当が見る。php の pathspec の `database/migrations/*` は拡張子を限定しないので、その配下の `.sql` は php の storage 担当の対象にもなる）。
 
 差分と focus block はプロンプトに埋め込まず、ファイルを参照させる。20 体ぶん埋め込むと 1 応答の出力上限を超え、本文を書き写すと rubric の原本とずれるため。
 
