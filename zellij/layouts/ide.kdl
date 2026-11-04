@@ -9,15 +9,17 @@ layout {
         }
     }
 
-    tab name="editor" focus=true {
+    tab name="ai" focus=true {
         pane split_direction="vertical" {
-            pane split_direction="horizontal" {
-                pane focus=true name="Editor" {
-                    command "hx"
-                }
-                pane size="50%" name="Implement"
-            }
-            pane size="40%" name="Review"
+            pane focus=true name="Implement"
+            pane size="35%" name="Review"
+        }
+    }
+
+    // hx を浮動ペインにしない: yazi-picker の toggle-floating-panes で hx ごと隠れ、`:open` の入力が AI ペインへ流れる。
+    tab name="editor" {
+        pane name="Editor" {
+            command "hx"
         }
     }
 }
