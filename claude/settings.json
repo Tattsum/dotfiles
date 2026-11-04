@@ -84,6 +84,7 @@
       "gh *",
       "git push *",
       "git fetch *",
+      "git commit *",
       "node *codex-companion.mjs*",
       "skill-cross-review *",
       "skill-review-state *",
