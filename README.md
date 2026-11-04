@@ -32,7 +32,7 @@ dotfiles 管理用リポジトリです。
 zellij をベースにしたターミナル IDE 環境を管理しています。
 
 - `zellij/config.kdl` — zellij のデフォルトレイアウトを `ide` に設定
-- `zellij/layouts/ide.kdl` — Editor / Implement / Review ペインからなる IDE レイアウト
+- `zellij/layouts/ide.kdl` — 実装用 AI（Implement）とレビュー用 AI（Review）を左右に並べた `ai` タブ（起動時に表示）と、helix を開いた `editor` タブからなる IDE レイアウト
 - `helix/config.toml` — helix のキーマップ（`C-y` で yazi をフローティング起動）
 - `helix/yazi-picker.sh` — yazi で選択したファイルを helix で開くためのスクリプト
 - `bin/ide` — プロジェクト選択 → zellij セッション attach を行う起動スクリプト（`~/.local/bin/ide` にリンク）
