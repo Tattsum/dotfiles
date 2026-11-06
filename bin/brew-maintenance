@@ -59,6 +59,23 @@ exec >>"$LOG" 2>&1
 echo "===== run start: $(date '+%Y-%m-%d %H:%M:%S') ====="
 
 failed=0
+
+# 自分自身への insteadOf は no-op ではない。最長一致で global の https→ssh を打ち消す（global を外すと private repo の取得に https 認証が要る）
+github_https_key='url.https://github.com/.insteadOf'
+github_https_url='https://github.com/'
+brew_repo="$(brew --repository)"
+for repo in "$brew_repo" "$brew_repo"/Library/Taps/*/*; do
+  [ -d "$repo/.git" ] || continue
+  git -C "$repo" config --fixed-value --get "$github_https_key" "$github_https_url" >/dev/null && continue
+
+  if git -C "$repo" config --add "$github_https_key" "$github_https_url"; then
+    echo "----- git remote: $repo の github.com を https で取得するよう設定"
+  else
+    echo "!!!!! FAILED: git config $github_https_key in $repo"
+    failed=1
+  fi
+done
+
 for step in "update" "upgrade" "cleanup"; do
   # if ! brew "$step" だと then 節の $? が否定後の 0 になり、終了コードを記録できない
   brew "$step"
