@@ -233,6 +233,7 @@ echo ""
 echo "------------------------------"
 echo "🍺 Homebrew パッケージ（Brewfile）を適用します..."
 echo "------------------------------"
+brew_bundle_failed=0
 if command -v brew >/dev/null 2>&1; then
   # bundle install は未導入を入れるだけでなく outdated な cask も更新する。bin/brew-maintenance と
   # 同じ抑制を効かせないと、セットアップのたびに起動中の Rancher Desktop やエディタが落とされ、
@@ -241,7 +242,11 @@ if command -v brew >/dev/null 2>&1; then
   export HOMEBREW_NO_UPGRADE_QUIT_CASKS=1
 
   # 冪等。インストール済みは skip され、未導入の formula/cask/tap のみ入る。
-  brew bundle install --file="$DOTFILES_DIR/brew/Brewfile"
+  # Homebrew の bin は PATH に既にあるが、mise の shims より前へ置き直さないと、brew は go の shim を絞った PATH で実行して落ちる。
+  if ! PATH="$(brew --prefix)/bin:$PATH" brew bundle install --file="$DOTFILES_DIR/brew/Brewfile"; then
+    brew_bundle_failed=1
+    echo "  ⚠️ Brewfile の一部を適用できませんでした（失敗した項目は上の出力を参照）。他のセットアップを続行します"
+  fi
 else
   echo "  ⏭ brew が見つからないためスキップ（https://brew.sh からインストール後に再実行）"
 fi
@@ -266,4 +271,7 @@ if ! "$DOTFILES_DIR/bin/install-launchagent"; then
 fi
 
 echo ""
+if [[ "$brew_bundle_failed" == 1 ]]; then
+  echo "⚠️ Brewfile の一部を適用できていません。上の brew bundle の出力で原因を直してから install.sh を再実行してください"
+fi
 echo "✅ セットアップ完了！"
