@@ -241,7 +241,8 @@ if command -v brew >/dev/null 2>&1; then
   export HOMEBREW_NO_UPGRADE_QUIT_CASKS=1
 
   # 冪等。インストール済みは skip され、未導入の formula/cask/tap のみ入る。
-  brew bundle install --file="$DOTFILES_DIR/brew/Brewfile"
+  # Homebrew の bin は PATH に既にあるが、mise の shims より前へ置き直さないと、brew は go の shim を絞った PATH で実行して落ちる。
+  PATH="$(brew --prefix)/bin:$PATH" brew bundle install --file="$DOTFILES_DIR/brew/Brewfile"
 else
   echo "  ⏭ brew が見つからないためスキップ（https://brew.sh からインストール後に再実行）"
 fi
