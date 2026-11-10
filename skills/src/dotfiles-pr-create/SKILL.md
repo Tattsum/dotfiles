@@ -106,7 +106,7 @@ gh pr create --base "$BASE" --title "$TITLE" --body-file "$BODY_FILE" --reviewer
 
 - PR が大きくなりすぎないよう分割を促す。差分は目安として 500 行以内、最大でも 1000 行程度に収める。
 - 関心が異なる変更（例: モデル追加とコントローラ追加）は別 PR に分けることを検討する（レビュー負荷を下げ、レビュー品質を保つため）。
-- 作成前に `git diff --stat <base>...HEAD` で変更ファイルを見て、目的の変更だけかを確かめる。stacked PR の下位や別件の変更が混ざっている、または base が合っていないと見えたら、作成せずに利用者へ報告する（明示された base は変えない。コミットの整理は `dotfiles-commit-push` の範囲）。
+- 作成前に `git diff --stat <base>...HEAD` で変更ファイルを見て、目的の変更だけかを確かめる。stacked PR の下位や別件の変更が混ざっている、または base が合っていないと見えたら、作成せずに利用者へ報告する（明示された base は変えない。コミットの整理は `dotfiles-commit-split` の範囲）。
 
 ## 方針
 
