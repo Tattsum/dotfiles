@@ -100,7 +100,7 @@
     }
   },
   "ultracode": true,
-  "advisorModel": "opus",
+  "advisorModel": "fable",
   "switchModelsOnFlag": false,
   "autoMode": {
     "allow": [
