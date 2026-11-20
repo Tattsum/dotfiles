@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = [
 #     "sudachipy==0.7.0",
-#     "sudachidict-core==20260723.1",
+#     "sudachidict-core==20261015",
 # ]
 # ///
 """terms.py — 専門用語候補（カタカナ複合語・ASCII英略語・固有名詞）を初出順に抽出する。
