@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = [
 #     "sudachipy==0.7.0",
-#     "sudachidict-core==20260723.1",
+#     "sudachidict-core==20261015",
 # ]
 # ///
 """lint.py — AI臭い日本語文章を決定的に検出する lint スクリプト。

@@ -2,7 +2,7 @@
 # requires-python = ">=3.10"
 # dependencies = [
 #     "sudachipy==0.7.0",
-#     "sudachidict-core==20260723.1",
+#     "sudachidict-core==20261015",
 # ]
 # ///
 """outline.py — 文書のスケルトン（見出し・各段落の先頭文・箇条書き）を抽出する。
