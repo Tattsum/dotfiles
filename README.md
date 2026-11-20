@@ -141,6 +141,26 @@ launchctl bootout gui/$(id -u)/<label>                       # 停止
   先に Claude Code のセッションをすべて終了してください。起動中のセッションがあると、張り替えたリンクが
   数秒で消えます（2026-10 に実測。リンク先の名前や、張り替えを Claude Code の外で行ったかには関係なく起きた）。
 
+### エージェントの Bash を検査する hook（agent-bash-guard）
+
+`tools/agent-bash-guard/` は、エージェントが Bash を実行する直前に呼ばれる PreToolUse hook です。
+sandbox の中で必ず失敗する書き方や、使わないと決めたコマンドを、理由と直し方を添えて拒否します。
+コマンド文字列から機械的に判定できる規則は、グローバル指示や skill に文章で書かず、ここに足します。
+
+- 登録先: Claude Code は `claude/settings.json` の `hooks.PreToolUse`、Codex は `codex/hooks.json`
+  （`./install.sh` が `~/.codex/hooks.json` へ symlink）。
+- 規則: Claude Code には、sandbox 除外コマンド（`gh`・`git commit/push/fetch`・`skill-*`）の複合実行、
+  除外コマンドへの `$TMPDIR` の受け渡し、`<(...)`、テンプレートなしの `mktemp`、sandbox 外での `aws`、
+  `GOBIN` なしの `go install`、`.git/config` や書き込み禁止パスに触れる git 操作、
+  インラインのインタプリタ（`python -c` など）、`rg -rn`、`op` を当てます。Codex には最後の 3 つだけを当てます。
+  複合実行は、settings の通信許可（`sandbox.network.allowedDomains` と `WebFetch(domain:…)`）と
+  Bash の `allowed_domains` で必要なホストに届くなら止めません。
+- ビルド: `./install.sh` が `go build` して `~/.local/bin/agent-bash-guard` に置きます。コードを変えたら
+  `./install.sh` を再実行してください。バイナリが無いあいだ、hook は何も止めません。
+- Codex は、hook を足したり `codex/hooks.json` を変えたりしたあと、Codex の `/hooks` で信頼を承認するまで
+  hook を実行しません。
+- テスト: `cd tools/agent-bash-guard && go test ./...`。
+
 ### Codex CLI のステータス行
 
 `~/.codex/config.toml` の `[tui]` に次の `status_line` を設定します。

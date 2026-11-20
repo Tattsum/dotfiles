@@ -27,6 +27,7 @@ echo "------------------------------"
 link_file "$DOTFILES_DIR/agents/AGENTS.md" "$HOME/.claude/CLAUDE.md"
 link_file "$DOTFILES_DIR/agents/AGENTS.md" "$HOME/.codex/AGENTS.md"
 link_file "$DOTFILES_DIR/claude/rules/claude-code.md" "$HOME/.claude/rules/claude-code.md"
+link_file "$DOTFILES_DIR/codex/hooks.json" "$HOME/.codex/hooks.json"
 
 echo ""
 echo "------------------------------"
@@ -223,6 +224,22 @@ if command -v brew >/dev/null 2>&1; then
   fi
 else
   echo "  ⏭ brew が見つからないためスキップ（https://brew.sh からインストール後に再実行）"
+fi
+
+echo ""
+echo "------------------------------"
+echo "🛡 エージェントの Bash を検査する hook をビルドします..."
+echo "------------------------------"
+# Bash を呼ぶたびに起動するので、go run で毎回コンパイルせず、ビルド済みのバイナリを置く。
+if command -v go >/dev/null 2>&1; then
+  mkdir -p "$HOME/.local/bin"
+  if go build -C "$DOTFILES_DIR/tools/agent-bash-guard" -o "$HOME/.local/bin/agent-bash-guard" .; then
+    echo "  ✅ $HOME/.local/bin/agent-bash-guard"
+  else
+    echo "  ⚠️ agent-bash-guard をビルドできませんでした。上の出力を確認してください（他のセットアップは続行します）"
+  fi
+else
+  echo "  ⏭ go が見つからないためスキップ（Go を入れてから install.sh を再実行）"
 fi
 
 echo ""

@@ -9,6 +9,23 @@
       "Bash(go build:*)",
       "Bash(skill-aws-reach:*)",
       "WebFetch(domain:play.google.com)"
+    ],
+    "deny": [
+      "Bash(op *)"
+    ]
+  },
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "test -x \"$HOME/.local/bin/agent-bash-guard\" && \"$HOME/.local/bin/agent-bash-guard\" --agent claude || true",
+            "timeout": 10
+          }
+        ]
+      }
     ]
   },
   "model": "claude-opus-5-5",

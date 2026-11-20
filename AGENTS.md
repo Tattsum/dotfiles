@@ -6,6 +6,8 @@
   - 全エージェント共通のグローバル指示: `agents/AGENTS.md`
   - Claude Code だけのグローバル指示: `claude/rules/`
   - skill: `skills/src/<skill-id>/`、skill から呼ぶスクリプト: `bin/skill-*`
+  - エージェントの Bash を検査する hook: `tools/agent-bash-guard/`
+- グローバル指示や skill に足したい規則がコマンド文字列から機械的に判定できるなら、文章ではなく `tools/agent-bash-guard` の規則として足す。変えたら、そのディレクトリで `go test ./...` を実行し、利用者に `./install.sh` の再実行を頼む。
 - 設定ファイルを増やしたら `install.sh` に `link_file` を足す。`install.sh` は `~` 配下に書き込むので、実行は人間に頼む。
 - `bin/` のスクリプトを変えたら、対応する `tests/<name>-test.sh` を実行する。
 - `bin/` に Go・Rust のスクリプトを初めて足すときは、`install.sh` での配り方とテストの形を先に人間と決める。
