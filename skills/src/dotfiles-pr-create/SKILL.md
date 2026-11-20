@@ -29,7 +29,7 @@ git rev-parse --abbrev-ref --symbolic-full-name @{u} 2>/dev/null # upstream（�
 git status -sb                                  # ahead/behind の確認
 ```
 
-デフォルトブランチは git と同じ呼び出しにまとめず、**単独の Bash 呼び出し**で取得する（まとめると sandbox の `gh *` 除外が効かず sandbox 内で動いて失敗する）。
+デフォルトブランチは次で取得する。
 
 ```bash
 gh repo view --json defaultBranchRef -q .defaultBranchRef.name

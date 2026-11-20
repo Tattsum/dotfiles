@@ -123,7 +123,7 @@ launchctl bootout gui/$(id -u)/<label>                       # 停止
 - 全エージェント共通のグローバル指示の正本は `agents/AGENTS.md` です。`./install.sh` により次へ symlink します。
   - Claude Code: `~/.claude/CLAUDE.md`
   - Codex: `~/.codex/AGENTS.md`
-- Claude Code だけの指示（sandbox 下での gh の扱いなど）は `claude/rules/` に置き、`~/.claude/rules/` へ symlink します。
+- Claude Code だけの指示は `claude/rules/` に置き、`~/.claude/rules/` へ symlink します。
   Codex には届けません。共通ファイルには `@import`・HTML コメント・Claude Code 固有の設定名を書かないでください
   （Codex がこれらを解釈する保証はありません）。
 - Cursor へはグローバル指示を自動配布しません。Cursor の User Rules は設定画面でしか登録できないためです。

@@ -22,7 +22,7 @@ description: 変更を「1 コミット = 1 つの処理の流れ」のコミッ
 
 利用者が直接「整理して」と頼んだときも、push 済みを書き換えるなら、force push の前に分割案を示して確認する。
 
-レビューコメントの有無は次のコマンドで見る（単独の Bash 呼び出し）。1 以上なら付いたとみなし、PR が無ければ 0 とみなす。
+レビューコメントの有無は次のコマンドで見る。1 以上なら付いたとみなし、PR が無ければ 0 とみなす。
 
 ```bash
 gh pr view --json reviews,comments -q '(.reviews | length) + (.comments | length)'
@@ -93,8 +93,6 @@ git apply --cached --recount <パッチの絶対パス>
 git commit --author="Jane Doe <jane@example.com>" --date="2026-01-02T03:04:05+09:00" -F <メッセージファイルの絶対パス>
 ```
 
-- `git commit` は単独の Bash 呼び出しにし、値はすべて展開済みのリテラルで書く。`$(...)`・環境変数の前置（`GIT_AUTHOR_DATE=...`）・`&&` を含めると、sandbox 除外の `git commit *` に一致しない。その場合は sandbox 内で動き、署名に失敗する。
-- メッセージファイルは sandbox 内で作り、sandbox 外で動く `git commit` には絶対パスをリテラルで渡す（`$TMPDIR` は内と外で指す場所が違う）。
 - committer と committer date は、今の利用者と時刻のままにする。
 
 author と author date は次のように決める。

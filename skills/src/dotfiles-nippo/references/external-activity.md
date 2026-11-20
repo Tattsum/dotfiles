@@ -89,7 +89,7 @@ cursor があれば同じ範囲を続ける。対象の投稿だけで意味を�
 ## GitHub
 
 既存の `gh` CLI を使い、`gh api user --jq .login` で本人を確認する。
-`gh` は単独コマンドで呼び、検索は本人と対象日、プロジェクト指定があれば対象 repo / org に絞る。
+検索は本人と対象日、プロジェクト指定があれば対象 repo / org に絞る。
 本人の PR / issue 作成、コメント、依頼された PR のレビュー、commit 等を候補にし、
 `gh api` の詳細・コメント・reviews 等から実際の actor / author と活動時刻を確認する。
 過去の活動日を調べる場合、`commenter` / `reviewed-by` と当日だけの `updated` 条件では取りこぼしうる。
