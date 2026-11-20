@@ -161,6 +161,9 @@ sandbox の中で必ず失敗する書き方や、使わないと決めたコマ
   hook を実行しません。
 - テスト: `cd tools/agent-bash-guard && go test ./...`。
 
+`zsh/.zshrc` は、Claude Code のシェル（`CLAUDECODE` が設定されている）では `sed`→`sd` などのモダン CLI への
+置き換えと `rm -i` などのエイリアスを張りません。エージェントが素のコマンドの構文で書いても動くようにするためです。
+
 ### Codex CLI のステータス行
 
 `~/.codex/config.toml` の `[tui]` に次の `status_line` を設定します。
