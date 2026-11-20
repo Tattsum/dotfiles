@@ -36,20 +36,24 @@ alias ..='cd ..'
 alias mkdir='mkdir -p'
 alias relogin='exec $SHELL -l'
 alias f='open .'
-alias rm='rm -i'
-alias cp='cp -i'
-alias mv='mv -i'
 
-# モダン CLI への置き換え（インストールされている場合のみ）
-command -v bat   >/dev/null 2>&1 && alias cat='bat'
-command -v procs >/dev/null 2>&1 && alias top='procs' && alias ps='procs'
-command -v dust  >/dev/null 2>&1 && alias du='dust'
-command -v fd    >/dev/null 2>&1 && alias find='fd'
-command -v sd    >/dev/null 2>&1 && alias sed='sd'
+# Claude Code のシェルでは張らない（sed・cat の構文のまま sd・bat が呼ばれて失敗し、rm -i は消さずに exit 0 を返すため）。
+if [[ -z "${CLAUDECODE:-}" ]]; then
+  alias rm='rm -i'
+  alias cp='cp -i'
+  alias mv='mv -i'
 
-# グローバルエイリアス
-alias -g L='| less'
-alias -g G='| grep'
+  # モダン CLI への置き換え（インストールされている場合のみ）
+  command -v bat   >/dev/null 2>&1 && alias cat='bat'
+  command -v procs >/dev/null 2>&1 && alias top='procs' && alias ps='procs'
+  command -v dust  >/dev/null 2>&1 && alias du='dust'
+  command -v fd    >/dev/null 2>&1 && alias find='fd'
+  command -v sd    >/dev/null 2>&1 && alias sed='sd'
+
+  # グローバルエイリアス
+  alias -g L='| less'
+  alias -g G='| grep'
+fi
 
 # PATH やツールの初期化はここに追記
 export PATH="/opt/homebrew/bin:/opt/homebrew/sbin:$HOME/.local/bin:$HOME/go/bin:$PATH"

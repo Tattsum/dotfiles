@@ -123,7 +123,7 @@ launchctl bootout gui/$(id -u)/<label>                       # 停止
 - 全エージェント共通のグローバル指示の正本は `agents/AGENTS.md` です。`./install.sh` により次へ symlink します。
   - Claude Code: `~/.claude/CLAUDE.md`
   - Codex: `~/.codex/AGENTS.md`
-- Claude Code だけの指示（sandbox 下での gh の扱いなど）は `claude/rules/` に置き、`~/.claude/rules/` へ symlink します。
+- Claude Code だけの指示は `claude/rules/` に置き、`~/.claude/rules/` へ symlink します。
   Codex には届けません。共通ファイルには `@import`・HTML コメント・Claude Code 固有の設定名を書かないでください
   （Codex がこれらを解釈する保証はありません）。
 - Cursor へはグローバル指示を自動配布しません。Cursor の User Rules は設定画面でしか登録できないためです。
@@ -140,6 +140,29 @@ launchctl bootout gui/$(id -u)/<label>                       # 停止
 - `~/.claude/CLAUDE.md` の symlink を張り替える（`install.sh` でリンク先を変える場合を含む）ときは、
   先に Claude Code のセッションをすべて終了してください。起動中のセッションがあると、張り替えたリンクが
   数秒で消えます（2026-10 に実測。リンク先の名前や、張り替えを Claude Code の外で行ったかには関係なく起きた）。
+
+### エージェントの Bash を検査する hook（agent-bash-guard）
+
+`tools/agent-bash-guard/` は、エージェントが Bash を実行する直前に呼ばれる PreToolUse hook です。
+sandbox の中で必ず失敗する書き方や、使わないと決めたコマンドを、理由と直し方を添えて拒否します。
+コマンド文字列から機械的に判定できる規則は、グローバル指示や skill に文章で書かず、ここに足します。
+
+- 登録先: Claude Code は `claude/settings.json` の `hooks.PreToolUse`、Codex は `codex/hooks.json`
+  （`./install.sh` が `~/.codex/hooks.json` へ symlink）。
+- 規則: Claude Code には、sandbox 除外コマンド（`gh`・`git commit/push/fetch`・`skill-*`）の複合実行、
+  除外コマンドへの `$TMPDIR` の受け渡し、`<(...)`、テンプレートなしの `mktemp`、sandbox 外での `aws`、
+  `GOBIN` なしの `go install`、`.git/config` や書き込み禁止パスに触れる git 操作、
+  インラインのインタプリタ（`python -c` など）、`rg -rn`、`op` を当てます。Codex には最後の 3 つだけを当てます。
+  複合実行は、settings の通信許可（`sandbox.network.allowedDomains` と `WebFetch(domain:…)`）と
+  Bash の `allowed_domains` で必要なホストに届くなら止めません。
+- ビルド: `./install.sh` が `go build` して `~/.local/bin/agent-bash-guard` に置きます。コードを変えたら
+  `./install.sh` を再実行してください。バイナリが無いあいだ、hook は何も止めません。
+- Codex は、hook を足したり `codex/hooks.json` を変えたりしたあと、Codex の `/hooks` で信頼を承認するまで
+  hook を実行しません。
+- テスト: `cd tools/agent-bash-guard && go test ./...`。
+
+`zsh/.zshrc` は、Claude Code のシェル（`CLAUDECODE` が設定されている）では `sed`→`sd` などのモダン CLI への
+置き換えと `rm -i` などのエイリアスを張りません。エージェントが素のコマンドの構文で書いても動くようにするためです。
 
 ### Codex CLI のステータス行
 
